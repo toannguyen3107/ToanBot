@@ -126,7 +126,9 @@ class TranslationCog(commands.Cog):
                 "❌ Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.",
                 ephemeral=True
             )
-
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print(f"Translation cog ready! Commands registered: {[cmd.name for cmd in self.get_app_commands()]}")
 
 async def setup(bot: commands.Bot):
     """Thiết lập cog"""
