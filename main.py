@@ -1,5 +1,4 @@
 import os
-import asyncio
 import logging
 from dotenv import load_dotenv
 
@@ -62,6 +61,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/hello - Bot trả lời chào.\n"
         "/ping - Kiểm tra xem bot có đang hoạt động không.\n"
         "/translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n\n"
+        "/help - Hiển thị hướng dẫn sử dụng bot.\n\n"
         "Hãy gõ / và chọn lệnh, hoặc gõ trực tiếp lệnh bạn muốn!"
     )
     await update.message.reply_text(help_text)

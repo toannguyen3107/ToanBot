@@ -2,6 +2,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+import asyncio
+
 import logging
 # --- Cấu hình Logging ---
 logging.basicConfig(
