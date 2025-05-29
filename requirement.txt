@@ -1,4 +1,4 @@
-discord.py
+python-telegram-bot
 python-dotenv
 google-generativeai
 langchain-google-genai
