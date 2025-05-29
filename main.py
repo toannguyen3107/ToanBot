@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # Import các thư viện Telegram Bot
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from cogs.translation import TranslationService
+from cogs.translate import TranslationService
 # Langchain và Google GenAI
 
 
