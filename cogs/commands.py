@@ -41,7 +41,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/start - Bắt đầu lại cuộc trò chuyện và nhận lời chào mừng.\n"
         "/hello - Bot trả lời chào.\n"
         "/ping - Kiểm tra xem bot có đang hoạt động không.\n"
-        "/translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n\n"
+        "/translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n"
         "/help - Hiển thị hướng dẫn sử dụng bot.\n\n"
         "Hãy gõ / và chọn lệnh, hoặc gõ trực tiếp lệnh bạn muốn!"
     )
