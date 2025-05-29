@@ -98,7 +98,11 @@ class TranslationCog(commands.Cog):
 
         # Gửi kết quả
         await interaction.followup.send(translated_text)
-
+        
+    @commands.command(name='test', help='Trả lời Pong! và độ trễ (Lệnh prefix)')
+    async def ping(self, ctx: commands.Context):
+        """Trả lời bằng 'Pong!' và độ trễ (Lệnh prefix)"""
+        await ctx.send(f'Pong! {round(self.bot.latency * 1000)}ms')
 
 # --- Setup function for the cog ---
 async def setup(bot: commands.Bot):
