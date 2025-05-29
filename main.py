@@ -33,4 +33,4 @@ async def ping(ctx):
     await ctx.send(f'Pong! {round(bot.latency * 1000)}ms')
 
 
-bot.run('YOUR_BOT_TOKEN_HERE')
+bot.run(TOKEN)
