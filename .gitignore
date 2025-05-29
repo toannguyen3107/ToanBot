@@ -4,4 +4,5 @@
 !.gitignore
 !main.py
 !requirements.txt
-!cogs/
+!cogs
+!cogs/*.py
