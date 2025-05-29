@@ -28,7 +28,7 @@ async def load_cogs():
     """Loads all extensions (cogs) from the cogs directory."""
     # Duyệt qua tất cả các file .py trong thư mục cogs
     for filename in os.listdir("./cogs"):
-        if filename.endswith(".py"):
+        if filename.endswith(".py") and filename != "__init__.py":
             # Bỏ ".py" để lấy tên module (ví dụ: general, translation)
             cog_name = filename[:-3]
             try:
