@@ -1,10 +1,7 @@
-# Ignore everything
+# Ignore everything initially
 *
 
-# But not these files
 !.gitignore
 !main.py
-!requirement.txt
-!docker-compose.yml
-!Dockerfile
-!.dockerignore
+!requirements.txt
+!cogs/
