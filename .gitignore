@@ -5,3 +5,6 @@
 !.gitignore
 !main.py
 !requirement.txt
+!docker-compose.yml
+!Dockerfile
+!.dockerignore
