@@ -52,7 +52,7 @@ class TranslationCog(commands.Cog):
 
         # Tạo LLMChain (chỉ 1 lần)
         if self.llm: # Chỉ tạo chain nếu LLM được khởi tạo thành công
-             self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
+             self.chain = self.prompt | self.llm
         else:
              self.chain = None
 
