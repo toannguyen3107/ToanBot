@@ -16,9 +16,7 @@ if not GOOGLE_API_KEY:
 translation_service = TranslationService(GOOGLE_API_KEY)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_name = update.effective_user.first_name
-    await update.message.reply_text(f"Chào mừng {user_name} đến với bot dịch thuật! "
-                                    f"Tôi có thể giúp bạn dịch văn bản.\n"
-                                    f"Gõ /translate <văn bản cần dịch>.")
+    await update.message.reply_text(f"Chào mừng {user_name} đến với bot hổ trợ công việc!")
 async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Chào!")
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -37,9 +35,9 @@ async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("Tôi là bot dịch thuật. Vui lòng sử dụng lệnh /translate <văn bản của bạn> để dịch.")
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     help_text = (
-        "Chào bạn! Tôi là bot dịch thuật. Dưới đây là các lệnh tôi có thể làm:\n\n"
+        "Xin chao! Tôi là Toan. Dưới đây là các lệnh tôi có thể làm:\n\n"
         "/start - Bắt đầu lại cuộc trò chuyện và nhận lời chào mừng.\n"
-        "/hello - Bot trả lời chào.\n"
+        "/hello - Toàn trả lời chào.\n"
         "/ping - Kiểm tra xem bot có đang hoạt động không.\n"
         "/translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n"
         "/help - Hiển thị hướng dẫn sử dụng bot.\n\n"
