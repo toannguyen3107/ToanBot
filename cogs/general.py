@@ -6,11 +6,6 @@ class GeneralCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # Lắng nghe sự kiện on_ready riêng cho cog (Tùy chọn, có thể dùng on_ready global)
-    # @commands.Cog.listener()
-    # async def on_ready(self):
-    #     print(f'Cog General đã sẵn sàng!')
-
     # --- Lệnh Prefix ---
     @commands.command(name='hello', help='Trả lời bằng "Chào!" (Lệnh prefix)')
     async def hello(self, ctx: commands.Context):
@@ -35,7 +30,6 @@ class GeneralCog(commands.Cog):
 
 
 # --- Setup function for the cog ---
-# Hàm này cần thiết để main.py có thể load cog
 async def setup(bot: commands.Bot):
     await bot.add_cog(GeneralCog(bot))
     print("Cog General đã được thiết lập.")

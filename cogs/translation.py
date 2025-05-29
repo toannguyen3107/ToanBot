@@ -1,31 +1,28 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
+from discord import app_commands # Cần import này trong mỗi file cog có lệnh slash
 import os
-from dotenv import load_dotenv # load_dotenv cũng có thể dùng trong cog nếu cần biến riêng
-import asyncio # Cần cho run_in_executor
+from dotenv import load_dotenv
+import asyncio
 
 # Import Langchain và Google GenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-# Không cần IPython.display trên môi trường bot
 
 
 class TranslationCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.google_api_key = os.getenv("GOOGLE_API_KEY") # Lấy API Key từ env
+        self.google_api_key = os.getenv("GOOGLE_API_KEY")
 
         if not self.google_api_key:
             print("WARNING: GOOGLE_API_KEY not found in environment variables. Translation feature will not work.")
-            self.llm = None # Khởi tạo None nếu thiếu key
+            self.llm = None
         else:
-            # Khởi tạo LLM instance (chỉ 1 lần)
             self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.5, google_api_key=self.google_api_key)
 
-        # Định nghĩa Response Schemas cho output parser
         self.response_schemas = [
             ResponseSchema(name="input", description="Câu văn ban đầu"),
             ResponseSchema(name="output", description="Câu văn đã được thông dịch")
@@ -33,7 +30,6 @@ class TranslationCog(commands.Cog):
         self.output_parser = StructuredOutputParser.from_response_schemas(self.response_schemas)
         self.format_instructions = self.output_parser.get_format_instructions()
 
-        # Định nghĩa Prompt Template
         self.prompt = PromptTemplate(
             input_variables=["val"],
             template="""Bạn là một chuyên gia trong ngôn ngữ anh. Ban sẽ đóng vai trò thông dịch cho tôi bất kể là tiếng việt hay tiếng anh. Bạn sẽ:
@@ -50,30 +46,25 @@ class TranslationCog(commands.Cog):
             partial_variables={"format_instructions": self.format_instructions}
         )
 
-        # Tạo LLMChain (chỉ 1 lần)
-        if self.llm: # Chỉ tạo chain nếu LLM được khởi tạo thành công
-             self.chain = self.prompt | self.llm
+        if self.llm:
+             # self.chain = LLMChain(llm=self.llm, prompt=self.prompt) # Vẫn dùng LLMChain để phù hợp với chain.run
+             self.chain = LLMChain(llm=self.llm, prompt=self.prompt) # GIỮ LẠI CÁI NÀY VÌ self.chain.run
         else:
              self.chain = None
 
 
-    # --- Helper function để chạy sync code trong executor ---
-    # Cần thiết vì chain.run là synchronous và không nên chạy trực tiếp trong async Discord event loop
     async def _run_translation_chain(self, text: str) -> str | None:
         """Runs the translation chain in a separate thread."""
         if not self.chain:
             return "Lỗi: Tính năng thông dịch chưa được cấu hình (thiếu API Key?)."
 
-        # Lấy event loop hiện tại
         loop = asyncio.get_event_loop()
-        # Chạy chain.run trong một thread pool executor
         try:
             raw_output = await loop.run_in_executor(
-                None, # Sử dụng default executor
-                self.chain.run, # Hàm muốn chạy
-                text # Tham số cho hàm
+                None,
+                self.chain.run, # Cần .run nếu dùng LLMChain
+                text
             )
-            # Parse output
             parsed_output = self.output_parser.parse(raw_output)
             return parsed_output.get('output', 'Không thể phân tích kết quả thông dịch.')
         except Exception as e:
@@ -81,33 +72,22 @@ class TranslationCog(commands.Cog):
             return f"Lỗi khi thông dịch: {e}"
 
 
-    # --- Lệnh Slash cho thông dịch ---
     @app_commands.command(name="translate", description="Thông dịch câu văn sử dụng AI (Tiếng Việt/Anh).")
     @app_commands.describe(text="Câu văn bạn muốn thông dịch.")
     async def slash_translate(self, interaction: discord.Interaction, text: str):
         """Thông dịch câu văn sử dụng AI."""
+        print(f"Received translation request: {text}")
         if not self.llm or not self.chain:
              await interaction.response.send_message("Tính năng thông dịch hiện không khả dụng. Vui lòng kiểm tra cấu hình bot.", ephemeral=True)
              return
 
-        # Acknowledge the interaction immediately as translation might take time
-        await interaction.response.defer(ephemeral=False) # ephemeral=True nếu chỉ muốn người dùng thấy
+        await interaction.response.defer(ephemeral=False)
 
-        # Chạy logic thông dịch
         translated_text = await self._run_translation_chain(text)
 
-        # Gửi kết quả
         await interaction.followup.send(translated_text)
 
-    @commands.command(name='test', help='Trả lời Pong! và độ trễ (Lệnh prefix)')
-    async def ping(self, ctx: commands.Context):
-        """Trả lời bằng 'Pong!' và độ trễ (Lệnh prefix)"""
-        await ctx.send(f'Pong! {round(self.bot.latency * 1000)}ms')
-    @app_commands.command(name="test", description="Trả lời Pong! và độ trễ (Lệnh slash)")
-    async def slash_ping(self, interaction: discord.Interaction):
-        """Trả lời Pong! và độ trễ (Lệnh slash)"""
-        await interaction.response.send_message(f"Pong! {round(self.bot.latency * 1000)}ms")
-        
+
 # --- Setup function for the cog ---
 async def setup(bot: commands.Bot):
     await bot.add_cog(TranslationCog(bot))
