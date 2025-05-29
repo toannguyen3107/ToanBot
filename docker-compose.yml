@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: discord_bot_container
+    container_name: telegram_bot_container
     env_file:
       - .env
     restart: unless-stopped
