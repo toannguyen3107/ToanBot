@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-import discord.app_commands
+from discord import app_commands
 import os
 from dotenv import load_dotenv # load_dotenv cũng có thể dùng trong cog nếu cần biến riêng
 import asyncio # Cần cho run_in_executor
