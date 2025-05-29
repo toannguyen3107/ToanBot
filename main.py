@@ -1,13 +1,9 @@
-
 import discord
 from discord.ext import commands
-import discord.app_commands
+import discord.app_commands 
 import os
 from dotenv import load_dotenv
-import asyncio
-
 load_dotenv()
-
 TOKEN = os.getenv("DISCORD_TOKEN")
 TEST_GUILD_ID = os.getenv("TEST_GUILD_ID")
 
@@ -15,32 +11,14 @@ if not TOKEN:
     raise ValueError("DISCORD_TOKEN not found in environment variables. Please set it in your .env file.")
 if not TEST_GUILD_ID:
      print("WARNING: TEST_GUILD_ID not found in .env. Slash commands will sync globally (takes time).")
-
 intents = discord.Intents.default()
-intents.message_content = True
-
+intents.message_content = True 
 bot = commands.Bot(command_prefix='!', intents=intents)
-
-async def load_cogs():
-    """Loads all extensions (cogs) from the cogs directory."""
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py") and filename != "__init__.py":
-            cog_name = filename[:-3]
-            try:
-                await bot.load_extension(f"cogs.{cog_name}")
-                print(f"Đã tải cog: {cog_name}")
-            except Exception as e:
-                print(f"Không thể tải cog {cog_name}: {e}")
-
-
 
 @bot.event
 async def on_ready():
     print(f'Bot đã đăng nhập với tên: {bot.user}')
     print('------')
-
-    await load_cogs()
-
     try:
         if TEST_GUILD_ID:
             guild = discord.Object(id=int(TEST_GUILD_ID))
@@ -49,12 +27,30 @@ async def on_ready():
         else:
             synced = await bot.tree.sync()
             print(f"Đã đồng bộ {len(synced)} lệnh slash toàn cầu")
-
     except Exception as e:
         print(f"Lỗi khi đồng bộ lệnh slash: {e}")
-
-    print('Bot đã sẵn sàng và các cogs đã được tải!')
+    print('Bot đã sẵn sàng!')
     print('------')
 
+@bot.command()
+async def hello(ctx):
+    """Trả lời bằng 'Chào!' (Lệnh prefix)"""
+    await ctx.send('Chào!')
+@bot.command()
 
+async def ping(ctx):
+    """Trả lời bằng 'Pong!' và độ trễ (Lệnh prefix)"""
+    await ctx.send(f'Pong! {round(bot.latency * 1000)}ms')
+@bot.tree.command(name="test", description="Bot trả lời chào!")
+async def slash_test(interaction: discord.Interaction):
+    """Bot trả lời chào! (Lệnh slash)"""
+    await interaction.response.send_message("Chào từ lệnh slash!")
+@bot.tree.command(name="hello", description="Bot trả lời chào!")
+async def slash_hello(interaction: discord.Interaction):
+    """Bot trả lời chào! (Lệnh slash)"""
+    await interaction.response.send_message("Chào!")
+@bot.tree.command(name="ping", description="Trả lời Pong! và độ trễ")
+async def slash_ping(interaction: discord.Interaction):
+    """Trả lời Pong! và độ trễ (Lệnh slash)"""
+    await interaction.response.send_message(f"Pong! {round(interaction.client.latency * 1000)}ms")
 bot.run(TOKEN)
