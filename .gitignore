@@ -2,6 +2,8 @@
 *
 
 !.gitignore
+!README.md
+!.env.example
 !main.py
 !requirements.txt
 !cogs
