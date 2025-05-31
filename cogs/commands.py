@@ -30,7 +30,8 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text("Đang thông dịch, vui lòng chờ...")
     
     translated_text = await translation_service.translate_text(text_to_translate)
-    await update.message.reply_text(f"Kết quả thông dịch:\n{translated_text}")
+    response_message_html = f"Kết quả thông dịch:<br><pre>{translated_text}</pre>"
+    await update.message.reply_html(response_message_html)
 async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Tôi là bot dịch thuật. Vui lòng sử dụng lệnh /translate <văn bản của bạn> để dịch.")
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
