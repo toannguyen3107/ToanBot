@@ -200,5 +200,5 @@ def _strip_unsupported_html_tags(html_string: str) -> str:
     cleaned_html = re.sub(r'<\/?html[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
     cleaned_html = re.sub(r'<\/?head[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
     cleaned_html = re.sub(r'<\/?body[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
-    
+
     return cleaned_html

@@ -67,6 +67,8 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         response = await kali_rag_service_instance.ask_question(query)
         # SỬ DỤNG reply_html VÌ LLM ĐƯỢC HƯỚNG DẪN TRẢ VỀ HTML
+        if response.startswith("```html") and response.endswith("```"):
+            response = response[7:-3]
         await update.message.reply_html(response) 
         
     except Exception as e:
