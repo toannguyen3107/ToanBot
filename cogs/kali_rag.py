@@ -123,21 +123,23 @@ class KaliRAGService:
 
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.3, google_api_key=self.google_api_key) 
 
-        # THAY ĐỔI PROMPT ĐỂ YÊU CẦU ĐỊNH DẠNG HTML CƠ BẢN
+        # ĐIỀU CHỈNH PROMPT ĐỂ YÊU CẦU HTML RẤT CƠ BẢN VÀ KHÔNG CHỨA CÁC TAG DOCUMENT-LEVEL
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp. 
         Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
         
-        **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng **HTML cơ bản**.
+        **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng các thẻ **HTML NỘI DUNG** mà Telegram Bot API hỗ trợ.
+        - **KHÔNG** bao gồm bất kỳ tag document-level nào như `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>`.
         - Sử dụng thẻ `<pre><code>` để bọc các lệnh và ví dụ code.
-        - Sử dụng thẻ `<b>` cho các tên công cụ hoặc từ khóa quan trọng.
-        - Đảm bảo các ký tự HTML đặc biệt như `<`, `>`, `&` trong văn bản bình thường được thoát thành `<`, `>`, `&`.
+        - Sử dụng thẻ `<b>` để bôi đậm các tên công cụ hoặc từ khóa quan trọng.
+        - Các ký tự đặc biệt của HTML như `<`, `>`, `&` trong văn bản bình thường (không phải trong code) phải được thoát thành `<`, `>`, `&`.
+        - Đảm bảo toàn bộ phản hồi là một đoạn HTML hợp lệ và đơn giản, không có các tag không được Telegram hỗ trợ.
         
         Ngữ cảnh công cụ:
-        {context} # Đảm bảo không có khoảng trắng thừa ở đây.
+        {context}
         
-        Câu hỏi của người dùng: {question} # Đảm bảo không có khoảng trắng thừa ở đây.
+        Câu hỏi của người dùng: {question}
         """)
 
         self.rag_chain = (
@@ -156,9 +158,46 @@ class KaliRAGService:
         
         try:
             response = await self.rag_chain.ainvoke(query)
-            # Không cần thoát ký tự thủ công ở đây vì LLM đã được yêu cầu output HTML
-            # và `reply_html` sẽ xử lý các ký tự HTML còn lại.
-            return response
+            # THÊM LỚP BẢO VỆ: Loại bỏ các thẻ HTML không hợp lệ nếu LLM vẫn tạo ra
+            # Sử dụng BeautifulSoup để làm sạch HTML không hợp lệ mà Telegram không hỗ trợ
+            cleaned_response = _strip_unsupported_html_tags(response)
+            return cleaned_response
         except Exception as e:
             logger.error(f"Error during RAG chain execution: {e}", exc_info=True)
             return f"Đã xảy ra lỗi khi tìm kiếm gợi ý: {e}"
+
+# --- Hàm trợ giúp để loại bỏ các thẻ HTML không được Telegram hỗ trợ ---
+# (Thêm vào cuối file kali_rag.py)
+def _strip_unsupported_html_tags(html_string: str) -> str:
+    """
+    Strips HTML tags that are not supported by Telegram Bot API for HTML parse mode.
+    Supported tags: <b>, <i>, <u>, <s>, <code>, <pre>, <a href="...">, <tg-spoiler>
+    """
+    supported_tags = ['b', 'i', 'u', 's', 'code', 'pre', 'a', 'tg-spoiler']
+    
+    soup = BeautifulSoup(html_string, 'html.parser')
+    
+    for tag in soup.find_all(True): # Iterate over all tags
+        if tag.name not in supported_tags:
+            tag.unwrap() # Remove the tag, but keep its content
+        elif tag.name == 'a' and not tag.get('href'): # Ensure <a> tags have href
+            tag.unwrap()
+        elif tag.name == 'pre' and not tag.find('code'): # Ensure <pre> contains <code>
+            tag.unwrap() # Or handle differently based on desired behavior
+        elif tag.name == 'code' and not tag.find_parent('pre'): # Ensure <code> is inside <pre> for block
+            # For inline code, you might want to convert ` to backticks or escape it.
+            # For now, if code is not in pre, just unwrap it.
+            tag.unwrap()
+
+
+    # After unwrapping unsupported tags, convert back to string
+    # Replace non-breaking spaces with regular spaces as they can sometimes cause issues
+    cleaned_html = str(soup).replace('\xa0', ' ')
+    
+    # Remove DOCTYPE, html, head, body tags if they somehow get generated
+    cleaned_html = re.sub(r'<!DOCTYPE html[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
+    cleaned_html = re.sub(r'<\/?html[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
+    cleaned_html = re.sub(r'<\/?head[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
+    cleaned_html = re.sub(r'<\/?body[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
+    
+    return cleaned_html
