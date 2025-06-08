@@ -4,8 +4,8 @@ import logging
 import json
 import os
 import time
+import shutil # Import shutil for rmtree
 from langchain_community.vectorstores import Chroma
-# THAY ĐỔI: Import từ langchain_google_genai thay vì langchain_openai
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
@@ -19,19 +19,19 @@ DATA_FILE = "data/kali_tools_data.json"
 CHROMA_DB_DIR = "./chroma_db"
 
 class KaliRAGService:
-    def __init__(self, google_api_key: str): # THAY ĐỔI: Nhận google_api_key
+    def __init__(self, google_api_key: str):
         self.rag_chain = None
-        self.google_api_key = google_api_key # THAY ĐỔI: Lưu google_api_key
+        self.google_api_key = google_api_key
 
-        if self.google_api_key: # THAY ĐỔI: Kiểm tra google_api_key
+        if self.google_api_key:
             try:
                 self._initialize_rag_chain()
-                logger.info("KaliRAGService initialized successfully using Google Generative AI.") # THAY ĐỔI: Log message
+                logger.info("KaliRAGService initialized successfully using Google Generative AI.")
             except Exception as e:
                 logger.error(f"Failed to initialize KaliRAGService: {e}", exc_info=True)
                 self.rag_chain = None
         else:
-            logger.warning("GOOGLE_API_KEY not provided. RAG feature will be unavailable.") # THAY ĐỔI: Log message
+            logger.warning("GOOGLE_API_KEY not provided. RAG feature will be unavailable.")
 
     def _load_and_prepare_data(self, filepath: str) -> list[Document]:
         """Tải dữ liệu công cụ đã scrape từ JSON và chuyển đổi sang định dạng LangChain Document."""
@@ -95,8 +95,6 @@ class KaliRAGService:
             logger.error("RAG Initialization failed: No documents available for RAG.")
             return None
 
-        # THAY ĐỔI: Khởi tạo Embeddings với GoogleGenerativeAIEmbeddings
-        # Sử dụng model "models/embedding-001" (hoặc các model embedding khác của Gemini)
         embeddings = GoogleGenerativeAIEmbeddings(google_api_key=self.google_api_key, model="models/embedding-001") 
         
         logger.info(f"[{time.strftime('%H:%M:%S')}] Initializing/Loading Chroma DB at {CHROMA_DB_DIR}...")
@@ -107,17 +105,16 @@ class KaliRAGService:
             # Kiểm tra nếu DB không rỗng, nếu rỗng thì tạo mới
             # Hoặc nếu embedding function thay đổi, bạn nên tạo mới để đảm bảo tương thích
             if vectorstore._collection.count() == 0:
-                logger.warning(f"[{time.strftime('%H:%M:%S')}] Existing Chroma DB is empty. Re-adding documents.")
+                logger.warning(f"[{time.strftime('%H:%M:%S')}] Existing Chroma DB is empty or incompatible. Re-adding documents.")
                 vectorstore.add_documents(documents)
                 logger.info(f"[{time.strftime('%H:%M:%S')}] Documents added to existing Chroma DB.")
             else:
                 logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded existing Chroma DB with {vectorstore._collection.count()} documents.")
 
         except Exception as e:
-            logger.warning(f"[{time.strftime('%H:%M:%S')}] Could not load existing Chroma DB: {e}. Creating new one.")
-            # THAY ĐỔI: Xóa thư mục Chroma DB nếu có lỗi để đảm bảo không có vấn đề tương thích Embedding
+            logger.warning(f"[{time.strftime('%H:%M:%S')}] Could not load existing Chroma DB: {e}. Attempting to recreate.")
+            # Xóa thư mục Chroma DB nếu có lỗi để đảm bảo không có vấn đề tương thích Embedding
             if os.path.exists(CHROMA_DB_DIR):
-                import shutil
                 shutil.rmtree(CHROMA_DB_DIR)
                 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
                 logger.warning(f"[{time.strftime('%H:%M:%S')}] Cleared old Chroma DB for recreation.")
@@ -125,18 +122,17 @@ class KaliRAGService:
             vectorstore = Chroma.from_documents(documents=documents, embedding=embeddings, persist_directory=CHROMA_DB_DIR)
             logger.info(f"[{time.strftime('%H:%M:%S')}] Created new Chroma DB from documents.")
         
-        # Tạo Retriever: tìm kiếm tài liệu liên quan nhất
         retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
-        # THAY ĐỔI: Khởi tạo LLM cho RAG với ChatGoogleGenerativeAI
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.3, google_api_key=self.google_api_key) 
 
-        # Định nghĩa Prompt Template cho RAG (giữ nguyên)
+        # ĐỊNH NGHĨA LẠI PROMPT ĐỂ YÊU CẦU MARKDOWN V2
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp. 
         Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
-        Luôn tập trung vào việc đưa ra các lệnh thực tế, ngắn gọn và hữu ích.
+        
+        **QUAN TRỌNG**: Hãy định dạng câu trả lời của bạn bằng *Markdown V2 syntax*. Đặc biệt là sử dụng block code với ba dấu gạch chéo ngược (\`\`\`) cho các lệnh. Bôi đậm các tên công cụ hoặc từ khóa quan trọng bằng dấu hoa thị (\*ví dụ\*).
         
         Ngữ cảnh công cụ:
         {context}
@@ -144,7 +140,6 @@ class KaliRAGService:
         Câu hỏi của người dùng: {question}
         """)
 
-        # Xây dựng chuỗi RAG
         self.rag_chain = (
             {"context": retriever, "question": RunnablePassthrough()}
             | rag_prompt

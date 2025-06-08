@@ -3,6 +3,7 @@
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode # Đảm bảo đã import ParseMode
 
 # Import TranslationService và KaliRAGService classes
 from cogs.translate import TranslationService
@@ -11,7 +12,6 @@ from cogs.kali_rag import KaliRAGService
 logger = logging.getLogger(__name__)
 
 # Khai báo các biến toàn cục để giữ instance của các Service
-# Các biến này sẽ được gán giá trị từ main.py khi bot khởi động.
 translation_service_instance: TranslationService = None
 kali_rag_service_instance: KaliRAGService = None
 
@@ -42,8 +42,9 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     try:
         translated_text = await translation_service_instance.translate_text(text_to_translate)
+        # reply_html đã ngụ ý ParseMode.HTML
         response_message_html = f"Kết quả thông dịch:\n\n<pre>{translated_text}</pre>"
-        await update.message.reply_html(response_message_html)
+        await update.message.reply_html(response_message_html) 
     except Exception as e:
         logger.error(f"Lỗi khi thực hiện thông dịch: {e}", exc_info=True)
         await update.message.reply_text("Đã xảy ra lỗi khi thông dịch văn bản của bạn. Vui lòng thử lại.")
@@ -64,7 +65,9 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     try:
         response = await kali_rag_service_instance.ask_question(query)
-        await update.message.reply_text(response)
+        # Sử dụng ParseMode.MARKDOWN_V2 vì chúng ta đã yêu cầu LLM định dạng như vậy
+        await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN_V2) 
+        
     except Exception as e:
         logger.error(f"Lỗi khi gọi Kali RAG service: {e}", exc_info=True)
         await update.message.reply_text("Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.")
@@ -86,12 +89,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     help_text = (
         "Xin chao! Tôi là bot hỗ trợ pentest.\n"
         "Dưới đây là các lệnh bạn có thể sử dụng:\n\n"
-        "/start - Bắt đầu lại cuộc trò chuyện và nhận lời chào mừng.\n"
-        "/hello - Lời chào thân thiện.\n"
-        "/ping - Kiểm tra xem bot có đang hoạt động không.\n"
-        "/translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n"
-        "/ask_kali <câu hỏi> - Gợi ý công cụ Kali Linux và lệnh pentest.\n"
-        "/help - Hiển thị hướng dẫn sử dụng bot.\n\n"
+        "*/start* - Bắt đầu lại cuộc trò chuyện và nhận lời chào mừng.\n"
+        "*/hello* - Lời chào thân thiện.\n"
+        "*/ping* - Kiểm tra xem bot có đang hoạt động không.\n"
+        "*/translate <văn bản>* - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n"
+        "*/ask\_kali <câu hỏi>* - Gợi ý công cụ Kali Linux và lệnh pentest.\n"
+        "*/help* - Hiển thị hướng dẫn sử dụng bot.\n\n"
         "Hãy gõ / và chọn lệnh, hoặc gõ trực tiếp lệnh bạn muốn!"
     )
-    await update.message.reply_text(help_text)
+    # Sử dụng ParseMode.MARKDOWN_V2 cho help_text
+    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
