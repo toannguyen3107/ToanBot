@@ -135,7 +135,7 @@ class KaliRAGService:
         - Sử dụng thẻ `<pre><code>` để bọc các lệnh và ví dụ code.
         - Sử dụng thẻ `<b>` để bôi đậm các tên công cụ hoặc từ khóa quan trọng.
         - Các ký tự đặc biệt của HTML như `<`, `>`, `&` trong văn bản bình thường (không phải trong code) phải được thoát thành `<`, `>`, `&`.
-        - Đảm bảo toàn bộ phản hồi là một đoạn HTML hợp lệ và đơn giản, không có các tag không được Telegram hỗ trợ.
+        - Đảm bảo toàn bộ phản hồi là một đoạn HTML hợp lệ và đơn giản, không có các tag không được Telegram hỗ trợ. Không cần thêm ```html hoặc ``` để bọc đoạn văn bản.
         
         Ngữ cảnh công cụ:
         {context}
