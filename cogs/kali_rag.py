@@ -136,9 +136,9 @@ class KaliRAGService:
         - Đảm bảo các ký tự HTML đặc biệt như `<`, `>`, `&` trong văn bản bình thường được thoát thành `<`, `>`, `&`.
         
         Ngữ cảnh công cụ:
-        {context}
+        {context} # Đảm bảo không có khoảng trắng thừa ở đây.
         
-        Câu hỏi của người dùng: {question}
+        Câu hỏi của người dùng: {question} # Đảm bảo không có khoảng trắng thừa ở đây.
         """)
 
         self.rag_chain = (
