@@ -4,6 +4,7 @@ import logging
 import json
 import os
 import time
+import re
 import shutil # Import shutil for rmtree
 from bs4 import BeautifulSoup
 from langchain_community.vectorstores import Chroma
