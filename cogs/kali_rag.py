@@ -4,9 +4,8 @@ import logging
 import json
 import os
 import time
-import re
 import shutil # Import shutil for rmtree
-from bs4 import BeautifulSoup
+
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -124,19 +123,19 @@ class KaliRAGService:
 
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.3, google_api_key=self.google_api_key) 
 
-        # ĐIỀU CHỈNH PROMPT ĐỂ YÊU CẦU HTML RẤT CƠ BẢN VÀ KHÔNG CHỨA CÁC TAG DOCUMENT-LEVEL
+        # ĐIỀU CHỈNH PROMPT ĐỂ YÊU CẦU MARKDOWN V2
+        # QUAN TRỌNG: Hãy chỉ dùng ` ``` ` cho code và tránh các ký tự đặc biệt khác trong văn bản thường.
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp. 
         Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
         
-        **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng các thẻ **HTML NỘI DUNG** mà Telegram Bot API hỗ trợ.
-        - **KHÔNG** bao gồm bất kỳ tag document-level nào như `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>`.
-        - Sử dụng thẻ `<pre><code>` để bọc các lệnh và ví dụ code.
-        - Sử dụng thẻ `<b>` để bôi đậm các tên công cụ hoặc từ khóa quan trọng.
-        - Các ký tự đặc biệt của HTML như `<`, `>`, `&` trong văn bản bình thường (không phải trong code) phải được thoát thành `<`, `>`, `&`.
-        - Đảm bảo toàn bộ phản hồi là một đoạn HTML hợp lệ và đơn giản, không có các tag không được Telegram hỗ trợ. Không cần thêm ```html hoặc ``` để bọc đoạn văn bản.
-        
+        **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng *MarkdownV2 syntax*.
+        - Sử dụng block code với ba dấu gạch chéo ngược (\`\`\`) cho CÁC LỆNH và ví dụ code.
+        - **KHÔNG** sử dụng bôi đậm (`*`) hoặc in nghiêng (`_`) cho các từ hoặc cụm từ thông thường.
+        - Tránh sử dụng các ký tự đặc biệt của MarkdownV2 (`[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.` , `!`) trong văn bản thông thường nếu chúng không phải là một phần của cú pháp Markdown hợp lệ.
+        - Nếu bạn cần hiển thị một dấu chấm `.` hoặc `!` hoặc `(` `)` v.v. trong văn bản không phải code, hãy đảm bảo bạn cũng thoát chúng.
+
         Ngữ cảnh công cụ:
         {context}
         
@@ -159,46 +158,12 @@ class KaliRAGService:
         
         try:
             response = await self.rag_chain.ainvoke(query)
-            # THÊM LỚP BẢO VỆ: Loại bỏ các thẻ HTML không hợp lệ nếu LLM vẫn tạo ra
-            # Sử dụng BeautifulSoup để làm sạch HTML không hợp lệ mà Telegram không hỗ trợ
-            cleaned_response = _strip_unsupported_html_tags(response)
-            return cleaned_response
+            # KHÔNG CÒN HÀM _strip_unsupported_html_tags Ở ĐÂY NỮA
+            return response
         except Exception as e:
             logger.error(f"Error during RAG chain execution: {e}", exc_info=True)
             return f"Đã xảy ra lỗi khi tìm kiếm gợi ý: {e}"
 
-# --- Hàm trợ giúp để loại bỏ các thẻ HTML không được Telegram hỗ trợ ---
-# (Thêm vào cuối file kali_rag.py)
-def _strip_unsupported_html_tags(html_string: str) -> str:
-    """
-    Strips HTML tags that are not supported by Telegram Bot API for HTML parse mode.
-    Supported tags: <b>, <i>, <u>, <s>, <code>, <pre>, <a href="...">, <tg-spoiler>
-    """
-    supported_tags = ['b', 'i', 'u', 's', 'code', 'pre', 'a', 'tg-spoiler']
-    
-    soup = BeautifulSoup(html_string, 'html.parser')
-    
-    for tag in soup.find_all(True): # Iterate over all tags
-        if tag.name not in supported_tags:
-            tag.unwrap() # Remove the tag, but keep its content
-        elif tag.name == 'a' and not tag.get('href'): # Ensure <a> tags have href
-            tag.unwrap()
-        elif tag.name == 'pre' and not tag.find('code'): # Ensure <pre> contains <code>
-            tag.unwrap() # Or handle differently based on desired behavior
-        elif tag.name == 'code' and not tag.find_parent('pre'): # Ensure <code> is inside <pre> for block
-            # For inline code, you might want to convert ` to backticks or escape it.
-            # For now, if code is not in pre, just unwrap it.
-            tag.unwrap()
-
-
-    # After unwrapping unsupported tags, convert back to string
-    # Replace non-breaking spaces with regular spaces as they can sometimes cause issues
-    cleaned_html = str(soup).replace('\xa0', ' ')
-    
-    # Remove DOCTYPE, html, head, body tags if they somehow get generated
-    cleaned_html = re.sub(r'<!DOCTYPE html[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
-    cleaned_html = re.sub(r'<\/?html[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
-    cleaned_html = re.sub(r'<\/?head[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
-    cleaned_html = re.sub(r'<\/?body[^>]*>', '', cleaned_html, flags=re.IGNORECASE).strip()
-
-    return cleaned_html
+# --- LOẠI BỎ HÀM _strip_unsupported_html_tags khỏi file này ---
+# def _strip_unsupported_html_tags(html_string: str) -> str:
+#     # ... (hàm này sẽ bị xóa) ...

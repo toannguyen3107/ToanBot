@@ -3,7 +3,8 @@
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
-# from telegram.constants import ParseMode # KHÔNG CẦN THIẾT NẾU CHỈ DÙNG HTML VÀ PLAIN TEXT
+from telegram.constants import ParseMode
+import re # Import re module
 
 # Import TranslationService và KaliRAGService classes
 from cogs.translate import TranslationService
@@ -15,7 +16,42 @@ logger = logging.getLogger(__name__)
 translation_service_instance: TranslationService = None
 kali_rag_service_instance: KaliRAGService = None
 
-# --- KHÔNG CÒN HÀM _escape_markdown_v2 Ở ĐÂY ---
+# --- Hàm trợ giúp để thoát ký tự cho MarkdownV2 ---
+def _escape_markdown_v2(text: str) -> str:
+    """
+    Escapes special characters for Telegram's MarkdownV2 parse_mode.
+    This function strictly escapes all characters that can be interpreted
+    as MarkdownV2 formatting, ensuring plain text is sent without parsing errors.
+    It intelligently avoids escaping characters inside triple backtick code blocks.
+    """
+    # Regex to find triple backtick code blocks
+    code_block_pattern = r'```(?:json|python|bash|text)?\n(.*?)\n```'
+    
+    # List of special characters that need escaping in MarkdownV2 outside of code blocks
+    # Reference: https://core.telegram.org/bots/api#markdownv2-style
+    special_chars = r'_*[]()~`>#+-=|{}.!'
+    
+    # Store code blocks and replace them with placeholders
+    code_blocks = []
+    def replace_code_block(match):
+        code_blocks.append(match.group(0))
+        return f"__CODE_BLOCK_{len(code_blocks) - 1}__"
+
+    text_with_placeholders = re.sub(code_block_pattern, replace_code_block, text, flags=re.DOTALL)
+    
+    # Escape special characters in the text outside of code blocks
+    # First, escape backslashes themselves
+    escaped_text_parts = text_with_placeholders.replace('\\', '\\\\')
+    
+    # Then escape other special characters
+    # Use a lambda function to add a backslash before each matched character
+    escaped_text_parts = re.sub(r'([%s])' % re.escape(special_chars), r'\\\1', escaped_text_parts)
+
+    # Restore code blocks
+    for i, code_block in enumerate(code_blocks):
+        escaped_text_parts = escaped_text_parts.replace(f"__CODE_BLOCK_{i}__", code_block)
+
+    return escaped_text_parts
 
 # --- Các hàm xử lý lệnh Telegram ---
 
@@ -66,10 +102,10 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     try:
         response = await kali_rag_service_instance.ask_question(query)
-        # SỬ DỤNG reply_html VÌ LLM ĐƯỢC HƯỚNG DẪN TRẢ VỀ HTML
-        if response.startswith("```html") and response.endswith("```"):
-            response = response[7:-3]
-        await update.message.reply_html(response) 
+        # Áp dụng hàm thoát ký tự cho phản hồi từ RAG chain
+        # Sau đó gửi với ParseMode.MARKDOWN_V2
+        escaped_response = _escape_markdown_v2(response)
+        await update.message.reply_text(escaped_response, parse_mode=ParseMode.MARKDOWN_V2) 
         
     except Exception as e:
         logger.error(f"Lỗi khi gọi Kali RAG service: {e}", exc_info=True)
@@ -89,17 +125,19 @@ async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # QUAY LẠI CHUỖI PLAIN TEXT MẶC ĐỊNH CHO HELP
-    help_text = (
+    help_text_raw = ( # Chuỗi RAW, chưa thoát ký tự
         "Xin chao! Tôi là bot hỗ trợ pentest.\n"
         "Dưới đây là các lệnh bạn có thể sử dụng:\n\n"
-        "/start - Bắt đầu lại cuộc trò chuyện và nhận lời chào mừng.\n"
-        "/hello - Lời chào thân thiện.\n"
-        "/ping - Kiểm tra xem bot có đang hoạt động không.\n"
-        "/translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n"
-        "/ask_kali <câu hỏi> - Gợi ý công cụ Kali Linux và lệnh pentest.\n"
-        "/help - Hiển thị hướng dẫn sử dụng bot.\n\n"
+        "* /start - Bắt đầu lại cuộc trò chuyện và nhận lời chào mừng.\n"
+        "* /hello - Lời chào thân thiện.\n"
+        "* /ping - Kiểm tra xem bot có đang hoạt động không.\n"
+        "* /translate <văn bản> - Dịch văn bản của bạn (tiếng Việt sang Anh, hoặc sửa ngữ pháp tiếng Anh).\n"
+        "* /ask_kali <câu hỏi> - Gợi ý công cụ Kali Linux và lệnh pentest.\n"
+        "* /help - Hiển thị hướng dẫn sử dụng bot.\n\n"
         "Hãy gõ / và chọn lệnh, hoặc gõ trực tiếp lệnh bạn muốn!"
     )
-    # Gửi dưới dạng plain text mặc định (parse_mode=None) để tránh lỗi.
-    await update.message.reply_text(help_text)
+    # Áp dụng hàm thoát ký tự cho help_text
+    escaped_help_text = _escape_markdown_v2(help_text_raw)
+    
+    # Gửi với ParseMode.MARKDOWN_V2
+    await update.message.reply_text(escaped_help_text, parse_mode=ParseMode.MARKDOWN_V2)
