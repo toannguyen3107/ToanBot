@@ -123,18 +123,20 @@ class KaliRAGService:
 
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.3, google_api_key=self.google_api_key) 
 
-        # ĐIỀU CHỈNH PROMPT ĐỂ YÊU CẦU MARKDOWN V2
-        # QUAN TRỌNG: Hãy chỉ dùng ` ``` ` cho code và tránh các ký tự đặc biệt khác trong văn bản thường.
+        # ĐIỀU CHỈNH PROMPT ĐỂ TRÁNH LỖI PHÂN TÍCH CÚ PHÁP CỦA LANGCHAIN
+        # Không dùng bất kỳ ký tự Markdown nào trong phần hướng dẫn format.
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp. 
         Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
         
         **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng *MarkdownV2 syntax*.
-        - Sử dụng block code với ba dấu gạch chéo ngược (\`\`\`) cho CÁC LỆNH và ví dụ code.
-        - **KHÔNG** sử dụng bôi đậm (`*`) hoặc in nghiêng (`_`) cho các từ hoặc cụm từ thông thường.
-        - Tránh sử dụng các ký tự đặc biệt của MarkdownV2 (`[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.` , `!`) trong văn bản thông thường nếu chúng không phải là một phần của cú pháp Markdown hợp lệ.
-        - Nếu bạn cần hiển thị một dấu chấm `.` hoặc `!` hoặc `(` `)` v.v. trong văn bản không phải code, hãy đảm bảo bạn cũng thoát chúng.
+        - Để hiển thị các khối mã (code blocks) và lệnh, hãy bắt đầu và kết thúc bằng ba dấu gạch chéo ngược trên một dòng riêng. Ví dụ:
+          ```
+          nmap -sV example.com
+          ```
+        - KHÔNG sử dụng các định dạng bôi đậm hoặc in nghiêng thông thường.
+        - Tránh sử dụng các ký tự đặc biệt như dấu gạch chéo ngược, dấu sao, dấu gạch dưới, dấu ngoặc vuông, dấu ngoặc đơn, dấu ngã, dấu huyền, dấu lớn hơn, dấu thăng, dấu cộng, dấu trừ, dấu bằng, dấu sổ thẳng, dấu ngoặc nhọn, dấu chấm, dấu chấm than trong văn bản thông thường nếu chúng không phải là một phần của cú pháp Markdown hợp lệ.
 
         Ngữ cảnh công cụ:
         {context}
@@ -158,12 +160,7 @@ class KaliRAGService:
         
         try:
             response = await self.rag_chain.ainvoke(query)
-            # KHÔNG CÒN HÀM _strip_unsupported_html_tags Ở ĐÂY NỮA
-            return response
+            return response # Trả về response thô, _escape_markdown_v2 sẽ xử lý sau
         except Exception as e:
             logger.error(f"Error during RAG chain execution: {e}", exc_info=True)
             return f"Đã xảy ra lỗi khi tìm kiếm gợi ý: {e}"
-
-# --- LOẠI BỎ HÀM _strip_unsupported_html_tags khỏi file này ---
-# def _strip_unsupported_html_tags(html_string: str) -> str:
-#     # ... (hàm này sẽ bị xóa) ...
