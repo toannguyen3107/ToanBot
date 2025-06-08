@@ -123,18 +123,17 @@ class KaliRAGService:
 
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.3, google_api_key=self.google_api_key) 
 
-        # ĐỊNH NGHĨA LẠI PROMPT ĐỂ YÊU CẦU MARKDOWN V2 CỰC KỲ NGHIÊM NGẶT
-        # Yêu cầu LLM chỉ sử dụng ``` cho code và không dùng * hay _ cho bold/italic
-        # vì chúng ta sẽ escape chúng sau đó.
+        # THAY ĐỔI PROMPT ĐỂ YÊU CẦU ĐỊNH DẠNG HTML CƠ BẢN
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp. 
         Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
         
-        **QUAN TRỌNG**: Hãy định dạng câu trả lời của bạn bằng *Markdown V2 syntax*.
-        - Sử dụng block code với ba dấu gạch chéo ngược (\`\`\`) cho CÁC LỆNH và ví dụ code.
-        - **KHÔNG** sử dụng bôi đậm (\*) hoặc in nghiêng (\_) cho các từ hoặc cụm từ thông thường. 
-        - Tránh sử dụng các ký tự đặc biệt (`_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.`, `!`) trong văn bản thông thường nếu chúng không phải là một phần của cú pháp Markdown V2 (như trong URL hoặc tên miền).
+        **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng **HTML cơ bản**.
+        - Sử dụng thẻ `<pre><code>` để bọc các lệnh và ví dụ code.
+        - Sử dụng thẻ `<b>` cho các tên công cụ hoặc từ khóa quan trọng.
+        - Tránh sử dụng các ký tự đặc biệt của Markdown V2 (\` _ * [ ] ( ) ~ > # + - = | { } . !`) trong văn bản nếu chúng không phải là một phần của URL hoặc tên miền. Các ký tự này sẽ được tự động thoát HTML nếu không nằm trong thẻ.
+        - Đảm bảo các ký tự HTML đặc biệt như `<`, `>`, `&` trong văn bản bình thường được thoát thành `<`, `>`, `&`.
         
         Ngữ cảnh công cụ:
         {context}
@@ -158,6 +157,8 @@ class KaliRAGService:
         
         try:
             response = await self.rag_chain.ainvoke(query)
+            # Không cần thoát ký tự thủ công ở đây vì LLM đã được yêu cầu output HTML
+            # và `reply_html` sẽ xử lý các ký tự HTML còn lại.
             return response
         except Exception as e:
             logger.error(f"Error during RAG chain execution: {e}", exc_info=True)
