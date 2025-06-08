@@ -5,8 +5,9 @@ import json
 import os
 import time
 import shutil # Import shutil for rmtree
+
 from langchain_community.vectorstores import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI 
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -100,10 +101,7 @@ class KaliRAGService:
         logger.info(f"[{time.strftime('%H:%M:%S')}] Initializing/Loading Chroma DB at {CHROMA_DB_DIR}...")
         os.makedirs(CHROMA_DB_DIR, exist_ok=True) # Ensure Chroma DB directory exists
         try:
-            # Cố gắng tải Chroma DB đã tồn tại
             vectorstore = Chroma(persist_directory=CHROMA_DB_DIR, embedding_function=embeddings)
-            # Kiểm tra nếu DB không rỗng, nếu rỗng thì tạo mới
-            # Hoặc nếu embedding function thay đổi, bạn nên tạo mới để đảm bảo tương thích
             if vectorstore._collection.count() == 0:
                 logger.warning(f"[{time.strftime('%H:%M:%S')}] Existing Chroma DB is empty or incompatible. Re-adding documents.")
                 vectorstore.add_documents(documents)
@@ -113,7 +111,6 @@ class KaliRAGService:
 
         except Exception as e:
             logger.warning(f"[{time.strftime('%H:%M:%S')}] Could not load existing Chroma DB: {e}. Attempting to recreate.")
-            # Xóa thư mục Chroma DB nếu có lỗi để đảm bảo không có vấn đề tương thích Embedding
             if os.path.exists(CHROMA_DB_DIR):
                 shutil.rmtree(CHROMA_DB_DIR)
                 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
@@ -126,13 +123,18 @@ class KaliRAGService:
 
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b", temperature=0.3, google_api_key=self.google_api_key) 
 
-        # ĐỊNH NGHĨA LẠI PROMPT ĐỂ YÊU CẦU MARKDOWN V2
+        # ĐỊNH NGHĨA LẠI PROMPT ĐỂ YÊU CẦU MARKDOWN V2 CỰC KỲ NGHIÊM NGẶT
+        # Yêu cầu LLM chỉ sử dụng ``` cho code và không dùng * hay _ cho bold/italic
+        # vì chúng ta sẽ escape chúng sau đó.
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp. 
         Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
         
-        **QUAN TRỌNG**: Hãy định dạng câu trả lời của bạn bằng *Markdown V2 syntax*. Đặc biệt là sử dụng block code với ba dấu gạch chéo ngược (\`\`\`) cho các lệnh. Bôi đậm các tên công cụ hoặc từ khóa quan trọng bằng dấu hoa thị (\*ví dụ\*).
+        **QUAN TRỌNG**: Hãy định dạng câu trả lời của bạn bằng *Markdown V2 syntax*.
+        - Sử dụng block code với ba dấu gạch chéo ngược (\`\`\`) cho CÁC LỆNH và ví dụ code.
+        - **KHÔNG** sử dụng bôi đậm (\*) hoặc in nghiêng (\_) cho các từ hoặc cụm từ thông thường. 
+        - Tránh sử dụng các ký tự đặc biệt (`_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.`, `!`) trong văn bản thông thường nếu chúng không phải là một phần của cú pháp Markdown V2 (như trong URL hoặc tên miền).
         
         Ngữ cảnh công cụ:
         {context}
