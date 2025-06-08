@@ -14,8 +14,8 @@ from langchain_core.documents import Document
 logger = logging.getLogger(__name__)
 
 # Cấu hình đường dẫn dữ liệu
-DATA_FILE = "data/kali_tools_data.json"
-CHROMA_DB_DIR = "./chroma_db"
+DATA_FILE = "../data/kali_tools_data.json"
+CHROMA_DB_DIR = "../chroma_db"
 
 class KaliRAGService:
     def __init__(self, openai_api_key: str):
