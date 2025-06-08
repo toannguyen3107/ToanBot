@@ -132,7 +132,6 @@ class KaliRAGService:
         **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng **HTML cơ bản**.
         - Sử dụng thẻ `<pre><code>` để bọc các lệnh và ví dụ code.
         - Sử dụng thẻ `<b>` cho các tên công cụ hoặc từ khóa quan trọng.
-        - Tránh sử dụng các ký tự đặc biệt của Markdown V2 (\` _ * [ ] ( ) ~ > # + - = | { } . !`) trong văn bản nếu chúng không phải là một phần của URL hoặc tên miền. Các ký tự này sẽ được tự động thoát HTML nếu không nằm trong thẻ.
         - Đảm bảo các ký tự HTML đặc biệt như `<`, `>`, `&` trong văn bản bình thường được thoát thành `<`, `>`, `&`.
         
         Ngữ cảnh công cụ:
