@@ -5,7 +5,7 @@ import json
 import os
 import time
 import shutil # Import shutil for rmtree
-
+from bs4 import BeautifulSoup
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
