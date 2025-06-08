@@ -4,15 +4,16 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# Import TranslationService class (không import instance)
+# Import TranslationService và KaliRAGService classes
 from cogs.translate import TranslationService
+from cogs.kali_rag import KaliRAGService # MỚI
 
 logger = logging.getLogger(__name__)
 
-# Khai báo các biến toàn cục để giữ instance của RAG chain và TranslationService
+# Khai báo các biến toàn cục để giữ instance của các Service
 # Các biến này sẽ được gán giá trị từ main.py khi bot khởi động.
-rag_chain = None
-translation_service_instance: TranslationService = None # Gợi ý kiểu dữ liệu cho rõ ràng
+translation_service_instance: TranslationService = None
+kali_rag_service_instance: KaliRAGService = None # MỚI
 
 # --- Các hàm xử lý lệnh Telegram ---
 
@@ -32,7 +33,6 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await update.message.reply_text("Bạn cần cung cấp văn bản để thông dịch. Ví dụ: /translate Xin chào thế giới")
         return
 
-    # Kiểm tra xem translation_service_instance đã được khởi tạo chưa
     if translation_service_instance is None or translation_service_instance.llm is None:
         await update.message.reply_text("Tính năng thông dịch hiện không khả dụng. Vui lòng kiểm tra cấu hình bot (GOOGLE_API_KEY).")
         logger.warning("TranslationService instance not initialized or LLM is None for translate_command.")
@@ -57,24 +57,22 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = " ".join(context.args)
     await update.message.reply_text(f"Đang tìm kiếm gợi ý cho: '{query}'...")
 
-    # Kiểm tra xem rag_chain đã được khởi tạo chưa
-    if rag_chain is None:
-        await update.message.reply_text("Bot RAG chưa được khởi tạo. Vui lòng thử lại sau hoặc thông báo cho admin.")
-        logger.error("RAG chain is None. Initialization likely failed in main.py.")
+    # Kiểm tra xem kali_rag_service_instance đã được khởi tạo và có sẵn RAG chain không
+    if kali_rag_service_instance is None or kali_rag_service_instance.rag_chain is None:
+        await update.message.reply_text("Bot RAG chưa được khởi tạo hoặc không khả dụng. Vui lòng thử lại sau hoặc thông báo cho admin.")
+        logger.error("KaliRAGService instance not initialized or RAG chain is None for ask_kali_command.")
         return
 
     try:
-        # Sử dụng ainvoke cho các chain của LangChain trong môi trường async
-        response = await rag_chain.ainvoke(query) 
+        # Gọi phương thức ask_question từ instance của KaliRAGService
+        response = await kali_rag_service_instance.ask_question(query) 
         await update.message.reply_text(response)
     except Exception as e:
-        logger.error(f"Lỗi khi gọi RAG chain: {e}", exc_info=True)
+        logger.error(f"Lỗi khi gọi Kali RAG service: {e}", exc_info=True)
         await update.message.reply_text("Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.")
 
 async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Xử lý các tin nhắn không phải là lệnh. Có thể được dùng để gợi ý /ask_kali hoặc /translate."""
-    # Nếu tin nhắn không phải là lệnh nào đã đăng ký, bot sẽ trả lời mặc định.
-    # Để tránh lặp lại tin nhắn khi người dùng cố gắng gõ lệnh /ask_kali hay /translate
+    """Xử lý các tin nhắn không phải là lệnh. Gợi ý sử dụng lệnh."""
     if update.message.text and (update.message.text.startswith('/ask_kali') or update.message.text.startswith('/translate')):
         return
         

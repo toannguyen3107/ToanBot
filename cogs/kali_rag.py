@@ -1,0 +1,157 @@
+# telegram_kali_bot/cogs/kali_rag.py
+
+import logging
+import json
+import os
+import time
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document
+
+logger = logging.getLogger(__name__)
+
+# Cấu hình đường dẫn dữ liệu
+DATA_FILE = "data/kali_tools_data.json"
+CHROMA_DB_DIR = "./chroma_db"
+
+class KaliRAGService:
+    def __init__(self, openai_api_key: str):
+        self.rag_chain = None
+        self.openai_api_key = openai_api_key
+
+        if self.openai_api_key:
+            try:
+                self._initialize_rag_chain()
+                logger.info("KaliRAGService initialized successfully.")
+            except Exception as e:
+                logger.error(f"Failed to initialize KaliRAGService: {e}", exc_info=True)
+                self.rag_chain = None
+        else:
+            logger.warning("OPENAI_API_KEY not provided. RAG feature will be unavailable.")
+
+    def _load_and_prepare_data(self, filepath: str) -> list[Document]:
+        """Tải dữ liệu công cụ đã scrape từ JSON và chuyển đổi sang định dạng LangChain Document."""
+        logger.info(f"[{time.strftime('%H:%M:%S')}] Loading data for RAG from {filepath}...")
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+        except FileNotFoundError:
+            logger.error(f"Error: Data file not found at {filepath}.")
+            logger.error("Please run 'python scripts/scrape_kali_tools.py' first to generate the data.")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON from {filepath}: {e}")
+            logger.error("Please ensure the JSON file is correctly formatted.")
+            return []
+
+        documents = []
+        for item in raw_data:
+            tool_name = item.get('name', 'N/A')
+            main_description = item.get('main_description', 'No detailed description.')
+            how_to_install = item.get('how_to_install', 'Installation command not found.')
+            tool_url = item.get('url', '')
+            
+            content_parts = [
+                f"Tool Name: {tool_name}",
+                f"Description: {main_description}",
+                f"How to Install: {how_to_install}"
+            ]
+            
+            if 'commands' in item and item['commands']:
+                commands_str = "Commands and Usage Examples:\n"
+                for cmd in item['commands']:
+                    sub_command = cmd.get('sub_command', 'N/A')
+                    usage_example = cmd.get('usage_example', 'No usage example.')
+                    if usage_example.strip():
+                        commands_str += f"- {sub_command}: {usage_example}\n"
+                    else:
+                        commands_str += f"- {sub_command}: Run `{sub_command} --help` or `man {sub_command}` for usage.\n"
+
+                content_parts.append(commands_str)
+            
+            full_content = "\n\n".join(content_parts).strip()
+
+            documents.append(
+                Document(
+                    page_content=full_content,
+                    metadata={
+                        "tool": tool_name,
+                        "category": item.get("category", "Unknown"),
+                        "url": tool_url
+                    }
+                )
+            )
+        logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded {len(documents)} documents for RAG.")
+        return documents
+
+    def _initialize_rag_chain(self):
+        """Khởi tạo các thành phần của RAG chain."""
+        documents = self._load_and_prepare_data(DATA_FILE)
+        if not documents:
+            logger.error("RAG Initialization failed: No documents available for RAG.")
+            return None
+
+        # Khởi tạo Embeddings với API key
+        embeddings = OpenAIEmbeddings(openai_api_key=self.openai_api_key) 
+        
+        logger.info(f"[{time.strftime('%H:%M:%S')}] Initializing/Loading Chroma DB at {CHROMA_DB_DIR}...")
+        os.makedirs(CHROMA_DB_DIR, exist_ok=True) # Ensure Chroma DB directory exists
+        try:
+            # Cố gắng tải Chroma DB đã tồn tại
+            vectorstore = Chroma(persist_directory=CHROMA_DB_DIR, embedding_function=embeddings)
+            # Kiểm tra nếu DB không rỗng, nếu rỗng thì tạo mới
+            if vectorstore._collection.count() == 0:
+                logger.warning(f"[{time.strftime('%H:%M:%S')}] Existing Chroma DB is empty. Re-adding documents.")
+                vectorstore.add_documents(documents)
+                logger.info(f"[{time.strftime('%H:%M:%S')}] Documents added to existing Chroma DB.")
+            else:
+                logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded existing Chroma DB with {vectorstore._collection.count()} documents.")
+
+        except Exception as e:
+            logger.warning(f"[{time.strftime('%H:%M:%S')}] Could not load existing Chroma DB: {e}. Creating new one.")
+            vectorstore = Chroma.from_documents(documents=documents, embedding=embeddings, persist_directory=CHROMA_DB_DIR)
+            logger.info(f"[{time.strftime('%H:%M:%S')}] Created new Chroma DB from documents.")
+        
+        # Tạo Retriever: tìm kiếm tài liệu liên quan nhất
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+        # Khởi tạo LLM cho RAG với API key
+        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.3, openai_api_key=self.openai_api_key) 
+
+        # Định nghĩa Prompt Template cho RAG
+        rag_prompt = ChatPromptTemplate.from_template("""
+        Bạn là một chuyên gia pentesting trợ giúp. 
+        Dựa vào các thông tin công cụ Kali Linux sau đây, hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
+        Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
+        Luôn tập trung vào việc đưa ra các lệnh thực tế, ngắn gọn và hữu ích.
+        
+        Ngữ cảnh công cụ:
+        {context}
+        
+        Câu hỏi của người dùng: {question}
+        """)
+
+        # Xây dựng chuỗi RAG
+        self.rag_chain = (
+            {"context": retriever, "question": RunnablePassthrough()}
+            | rag_prompt
+            | llm
+            | StrOutputParser()
+        )
+        
+        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized.")
+
+    async def ask_question(self, query: str) -> str:
+        """Invokes the RAG chain with a given query."""
+        if self.rag_chain is None:
+            return "Tính năng gợi ý công cụ Kali hiện không khả dụng. Vui lòng kiểm tra cấu hình bot."
+        
+        try:
+            response = await self.rag_chain.ainvoke(query)
+            return response
+        except Exception as e:
+            logger.error(f"Error during RAG chain execution: {e}", exc_info=True)
+            return f"Đã xảy ra lỗi khi tìm kiếm gợi ý: {e}"
