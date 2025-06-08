@@ -6,14 +6,14 @@ from telegram.ext import ContextTypes
 
 # Import TranslationService và KaliRAGService classes
 from cogs.translate import TranslationService
-from cogs.kali_rag import KaliRAGService # MỚI
+from cogs.kali_rag import KaliRAGService
 
 logger = logging.getLogger(__name__)
 
 # Khai báo các biến toàn cục để giữ instance của các Service
 # Các biến này sẽ được gán giá trị từ main.py khi bot khởi động.
 translation_service_instance: TranslationService = None
-kali_rag_service_instance: KaliRAGService = None # MỚI
+kali_rag_service_instance: KaliRAGService = None
 
 # --- Các hàm xử lý lệnh Telegram ---
 
@@ -57,15 +57,13 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = " ".join(context.args)
     await update.message.reply_text(f"Đang tìm kiếm gợi ý cho: '{query}'...")
 
-    # Kiểm tra xem kali_rag_service_instance đã được khởi tạo và có sẵn RAG chain không
     if kali_rag_service_instance is None or kali_rag_service_instance.rag_chain is None:
         await update.message.reply_text("Bot RAG chưa được khởi tạo hoặc không khả dụng. Vui lòng thử lại sau hoặc thông báo cho admin.")
         logger.error("KaliRAGService instance not initialized or RAG chain is None for ask_kali_command.")
         return
 
     try:
-        # Gọi phương thức ask_question từ instance của KaliRAGService
-        response = await kali_rag_service_instance.ask_question(query) 
+        response = await kali_rag_service_instance.ask_question(query)
         await update.message.reply_text(response)
     except Exception as e:
         logger.error(f"Lỗi khi gọi Kali RAG service: {e}", exc_info=True)

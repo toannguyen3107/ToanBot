@@ -8,7 +8,7 @@ from telegram.ext import CommandHandler, Application, MessageHandler, filters
 
 # Import TranslationService và KaliRAGService classes
 from cogs.translate import TranslationService
-from cogs.kali_rag import KaliRAGService # MỚI
+from cogs.kali_rag import KaliRAGService
 
 # Import cogs.commands module để gán các instance service vào các biến toàn cục
 import cogs.commands 
@@ -24,17 +24,18 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # Được sử dụng cho RAG (embeddings và ChatOpenAI)
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Được sử dụng cho TranslationService (Gemini)
+# THAY ĐỔI: Xóa OPENAI_API_KEY nếu không còn sử dụng trực tiếp trong main.py
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") 
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Được sử dụng cho cả RAG (Gemini) và Translation (Gemini)
 
 # Kiểm tra sự tồn tại của các token/API keys
 if not TELEGRAM_BOT_TOKEN:
     logger.critical("TELEGRAM_BOT_TOKEN not found in .env file. Exiting.")
     exit(1)
-if not OPENAI_API_KEY:
-    logger.warning("OPENAI_API_KEY not found in .env file. RAG feature may be limited or unavailable.")
+# THAY ĐỔI: Kiểm tra GOOGLE_API_KEY cho cả hai tính năng
 if not GOOGLE_API_KEY:
-    logger.warning("GOOGLE_API_KEY not found in .env file. Translation feature may be limited or unavailable.")
+    logger.critical("GOOGLE_API_KEY not found in .env file. Both RAG and Translation features will be unavailable. Exiting.")
+    exit(1)
 
 
 # --- Main function của Bot Telegram ---
@@ -50,7 +51,7 @@ def main() -> None:
 
     # Khởi tạo KaliRAGService
     # Gán instance KaliRAGService vào biến toàn cục trong cogs.commands
-    cogs.commands.kali_rag_service_instance = KaliRAGService(OPENAI_API_KEY)
+    cogs.commands.kali_rag_service_instance = KaliRAGService(GOOGLE_API_KEY) # THAY ĐỔI: Truyền GOOGLE_API_KEY
     if cogs.commands.kali_rag_service_instance.rag_chain is None:
         logger.critical("Failed to initialize KaliRAGService. RAG feature will be unavailable.")
         # Bạn có thể chọn exit(1) ở đây nếu RAG là tính năng bắt buộc.
