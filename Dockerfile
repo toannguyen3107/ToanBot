@@ -8,8 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir data chroma_db
+RUN mkdir data
 
-RUN python3 scripts/scrape_kali_tools.py
+RUN python3 scripts/scrape_kali_tools.py 
+
 
 CMD ["python", "main.py"]

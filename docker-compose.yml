@@ -1,5 +1,3 @@
-version: '3.8' # Phiên bản của Docker Compose
-
 services:
   bot:
     build:
@@ -9,3 +7,8 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    volumes:
+      - chroma_db_volume:/app/chroma_db
+
+volumes:
+  chroma_db_volume:
