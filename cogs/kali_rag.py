@@ -158,7 +158,7 @@ class KaliRAGService:
             return
 
         retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=self.google_api_key)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.3, google_api_key=self.google_api_key)
         
         # CẬP NHẬT PROMPT HTML THEO CÁC THẺ TELEGRAM HỖ TRỢ
         html_template_string = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
