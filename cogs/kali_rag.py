@@ -165,7 +165,7 @@ class KaliRAGService:
 Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
 Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
 
-**QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp **HTML** của Telegram. Chỉ sử dụng các thẻ HTML sau, không được thêm bất kỳ thẻ nào khác kể cả `<p>`, `html`, `body`, `head`,...:
+**QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp **HTML** của Telegram. Chỉ sử dụng các thẻ HTML sau, không được thêm bất kỳ thẻ nào khác kể cả `<p>`, `html`, `body`, `head`, `br`,...:
 `<b>`, `<strong>` (cho chữ đậm)
 `<i>`, `<em>` (cho chữ nghiêng)
 `<u>`, `<ins>` (cho chữ gạch chân)
