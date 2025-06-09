@@ -25,18 +25,21 @@ def _escape_html_internal(text: str) -> str:
 
 class KaliRAGService:
     def __init__(self, google_api_key: str):
-        self.rag_chain = None
+        self.rag_chain_phase1 = None
+        self.llm_chain_phase2 = None
+        self.retriever = None
+        self.llm = None
         self.google_api_key = google_api_key
+
         if self.google_api_key:
             try:
-                self._initialize_rag_chain()
-                if self.rag_chain:
-                    logger.info("KaliRAGService initialized successfully with RAG chain.")
+                self._initialize_chains() 
+                if self.rag_chain_phase1 and self.llm_chain_phase2:
+                    logger.info("KaliRAGService initialized successfully with Phase 1 & 2 chains.")
                 else:
-                    logger.error("KaliRAGService initialization attempted, but RAG chain is still None. RAG feature will be unavailable.")
+                    logger.error("KaliRAGService initialization failed for one or both chains. RAG feature may be partially or fully unavailable.")
             except Exception as e:
                 logger.error(f"Unhandled exception during KaliRAGService __init__: {e}", exc_info=True)
-                self.rag_chain = None
         else:
             logger.warning("GOOGLE_API_KEY not provided. RAG feature will be unavailable.")
 
@@ -87,11 +90,10 @@ class KaliRAGService:
         logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded {len(documents)} documents for RAG.")
         return documents
 
-    def _initialize_rag_chain(self):
+    def _initialize_chains(self):
         documents = self._load_and_prepare_data(DATA_FILE)
         if not documents:
             logger.error("RAG Initialization failed: No documents available for RAG.")
-            self.rag_chain = None
             return
 
         embeddings = GoogleGenerativeAIEmbeddings(google_api_key=self.google_api_key, model="models/embedding-001")
@@ -146,20 +148,44 @@ class KaliRAGService:
                 logger.info(f"[{time.strftime('%H:%M:%S')}] Chroma vectorstore created/populated for '{collection_name}'.")
             except Exception as create_err:
                 logger.error(f"[{time.strftime('%H:%M:%S')}] Failed to create/populate Chroma vectorstore: {create_err}", exc_info=True)
-                self.rag_chain = None
                 return
 
         if vectorstore is None:
             logger.error(f"[{time.strftime('%H:%M:%S')}] Vectorstore is still None. RAG will be unavailable.")
-            self.rag_chain = None
             return
 
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=self.google_api_key) # Cập nhật model nếu cần
+        self.retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=self.google_api_key)
         
-        html_template_string = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
-Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
-Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
+        html_template_phase1 = """Bạn là một trợ lý tìm kiếm thông tin.
+Nhiệm vụ của bạn là trả lời câu hỏi của người dùng DỰA HOÀN TOÀN vào 'Ngữ cảnh công cụ' được cung cấp.
+- Nếu 'Ngữ cảnh công cụ' chứa thông tin đủ để trả lời câu hỏi, hãy định dạng câu trả lời bằng HTML của Telegram theo các quy tắc sau:
+    - Chỉ sử dụng các thẻ: <b>, <strong>, <i>, <em>, <u>, <ins>, <s>, <strike>, <del>, <span class="tg-spoiler">, <tg-spoiler>, <a href="URL">, <code>, <pre>.
+    - KHÔNG dùng: <p>, <div>, <ul>, <li>, <br>, <html>, <head>, <body>.
+    - Escape các ký tự HTML đặc biệt (&, <, >) trong văn bản và trong <code> (nếu không nằm trong <pre>).
+    - Dùng \n cho xuống dòng, \n\n cho đoạn văn.
+- Nếu 'Ngữ cảnh công cụ' KHÔNG chứa thông tin liên quan hoặc KHÔNG đủ để trả lời, hoặc bạn không chắc chắn, hãy trả về CHÍNH XÁC chuỗi: [NO_CONTEXT_DATA_FOUND]
+- KHÔNG thêm bất kỳ thông tin nào khác ngoài chuỗi đó nếu không có context. KHÔNG giải thích, KHÔNG xin lỗi.
+
+Ngữ cảnh công cụ:
+{context}
+
+Câu hỏi của người dùng: {question}
+
+Câu trả lời (HTML hoặc chuỗi [NO_CONTEXT_DATA_FOUND]):
+"""
+        prompt_phase1 = ChatPromptTemplate.from_template(html_template_phase1)
+        
+        self.rag_chain_phase1 = (
+            {"context": self.retriever, "question": RunnablePassthrough()}
+            | prompt_phase1
+            | self.llm
+            | StrOutputParser()
+        )
+        logger.info("RAG Chain Phase 1 initialized.")
+
+        html_template_phase2 = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt dựa trên kiến thức chung của bạn.
+Hãy trả lời câu hỏi của người dùng một cách chi tiết và hữu ích.
 
 **YÊU CẦU ĐỊNH DẠNG HTML NGHIÊM NGẶT CHO TELEGRAM:**
 1.  **Chỉ sử dụng các thẻ HTML sau**: `<b>` (hoặc `<strong>`), `<i>` (hoặc `<em>`), `<u>` (hoặc `<ins>`), `<s>` (hoặc `<strike>`, `<del>`), `<span class="tg-spoiler">` (hoặc `<tg-spoiler>`), `<a href="URL">`, `<code>`, `<pre>`.
@@ -174,38 +200,40 @@ Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên
     - Mục một
     - Mục hai
 9.  **Đoạn văn**: Tách các đoạn văn bằng một dòng trống (hai ký tự `\n\n`).
-10. **Luôn bao gồm ghi chú sau ở cuối câu trả lời của bạn, định dạng bằng thẻ <i>**: "<i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), vui lòng kiểm chứng thông tin.</i>"
-
-Ngữ cảnh công cụ:
-{context}
+10. **BẮT BUỘC bao gồm ghi chú sau ở cuối câu trả lời của bạn, định dạng bằng thẻ <i>**: "<i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), không phải từ cơ sở dữ liệu thực tế, vui lòng kiểm chứng thông tin.</i>"
 
 Câu hỏi của người dùng: {question}
 
-Câu trả lời (tiếng Việt, tuân thủ nghiêm ngặt các quy tắc định dạng HTML cho Telegram ở trên):
+Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hướng dẫn, và có ghi chú ở cuối):
 """
-        rag_prompt = ChatPromptTemplate.from_template(html_template_string)
-
-        self.rag_chain = (
-            {"context": retriever, "question": RunnablePassthrough()}
-            | rag_prompt
-            | llm
+        prompt_phase2 = ChatPromptTemplate.from_template(html_template_phase2)
+        
+        self.llm_chain_phase2 = (
+            prompt_phase2 
+            | self.llm
             | StrOutputParser()
         )
-        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode - stricter rules).")
+        logger.info("LLM Chain Phase 2 initialized.")
+
 
     async def ask_question(self, query: str) -> str:
-        if self.rag_chain is None:
-            return _escape_html_internal(
-                "Tính năng gợi ý công cụ Kali hiện không khả dụng. "
-                "Vui lòng kiểm tra cấu hình bot hoặc thông báo cho admin."
-            )
-        try:
-            response = await self.rag_chain.ainvoke(query)
-            # Thêm strip() ở đây để loại bỏ khoảng trắng thừa từ LLM
-            return response.strip() 
-        except Exception as e:
-            logger.error(f"Error during RAG chain execution for query '{query}': {e}", exc_info=True)
-            error_detail = str(e)[:150] 
-            return _escape_html_internal(
-                f"Đã xảy ra lỗi khi tìm kiếm gợi ý. Vui lòng thử lại sau. Lỗi: {error_detail}"
-            )
+        no_context_marker = "[NO_CONTEXT_DATA_FOUND]"
+
+        if not self.rag_chain_phase1:
+            return _escape_html_internal("Lỗi: RAG Chain Pha 1 chưa được khởi tạo.")
+
+        logger.info(f"Phase 1 RAG: Querying for '{query}'")
+        response_phase1 = await self.rag_chain_phase1.ainvoke(query)
+        response_phase1 = response_phase1.strip()
+        logger.info(f"Phase 1 RAG: Response: '{response_phase1[:200].replace('\n', ' ')}...'")
+
+        if response_phase1 != no_context_marker:
+            logger.info("Phase 1 RAG: Answer found in context.")
+            return response_phase1
+        else:
+            logger.info("Phase 1 RAG: No context found. Proceeding to Phase 2 (LLM only).")
+            if not self.llm_chain_phase2:
+                return _escape_html_internal("Lỗi: LLM Chain Pha 2 chưa được khởi tạo.")
+            
+            response_phase2 = await self.llm_chain_phase2.ainvoke({"question": query})
+            return response_phase2.strip()
