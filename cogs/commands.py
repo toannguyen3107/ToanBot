@@ -118,7 +118,7 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.error(f"Lỗi không xác định khi gọi Kali RAG service for query '{_escape_html(query)}': {e}", exc_info=True)
         error_detail = str(e)[:100] 
         user_error_message = _escape_html(f"Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.\nChi tiết: {error_detail}")
-        await update.message.reply_text(user_error_message, parse_mode=ParseMode.HTML)
+        await update.message.reply_text(response_html)
 
 async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message.text and update.message.text.startswith('/'): 
