@@ -10,6 +10,8 @@ COPY . .
 
 RUN mkdir data chroma_db
 
+RUN chmod 777 data chroma_db
+
 RUN python3 scripts/scrape_kali_tools.py
 
 CMD ["python", "main.py"]
