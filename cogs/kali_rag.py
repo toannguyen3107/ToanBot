@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
-import html # Để escape HTML
+import html 
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,6 @@ class KaliRAGService:
             logger.warning("GOOGLE_API_KEY not provided. RAG feature will be unavailable.")
 
     def _load_and_prepare_data(self, filepath: str) -> list[Document]:
-        # ... (Giữ nguyên hàm này) ...
         logger.info(f"[{time.strftime('%H:%M:%S')}] Loading data for RAG from {filepath}...")
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -88,9 +87,7 @@ class KaliRAGService:
         logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded {len(documents)} documents for RAG.")
         return documents
 
-
     def _initialize_rag_chain(self):
-        # ... (Phần load documents và khởi tạo embeddings, vectorstore giữ nguyên) ...
         documents = self._load_and_prepare_data(DATA_FILE)
         if not documents:
             logger.error("RAG Initialization failed: No documents available for RAG.")
@@ -158,42 +155,33 @@ class KaliRAGService:
             return
 
         retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.3, google_api_key=self.google_api_key)
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=self.google_api_key) # Cập nhật model nếu cần
         
-        # CẬP NHẬT PROMPT HTML THEO CÁC THẺ TELEGRAM HỖ TRỢ
         html_template_string = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
 Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
-Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế và Phải bao gồm ghi chú sau ở cuối mỗi câu trả lời, định dạng bằng thẻ <i>: "<i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), không phải từ cơ sở dữ liệu thực tế.</i>" nếu rơi vào trường hợp này, ngược lại nếu có thông tin từ 'Ngữ cảnh công cụ' thì không cần ghi chú này.
+Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
 
-**QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp **HTML** của Telegram.
-- **CHỈ SỬ DỤNG CÁC THẺ HTML SAU**: `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<ins>`, `<s>`, `<strike>`, `<del>`, `<span class="tg-spoiler">` (hoặc `<tg-spoiler>`), `<a href="URL">`, `<code>`, `<pre>`.
-- **TUYỆT ĐỐI KHÔNG SỬ DỤNG**: các thẻ như `<html>`, `<head>`, `<body>`, `<p>`, `<div>`, `<ul>`, `<li>`, `<br>` hoặc các thẻ HTML khác không được liệt kê ở trên.
-- **Không bao gồm các comment HTML** (`<!-- ... -->`).
-- Câu trả lời của bạn chỉ nên bao gồm văn bản và các thẻ HTML được phép.
-
-- **Khối mã (Code Blocks)**: Sử dụng thẻ `<pre><code>...</code></pre>` để hiển thị các lệnh hoặc ví dụ mã. Bên trong `<code>` (khi nằm trong `<pre>`), các ký tự `<`, `>`, `&` NÊN được escape thành `<`, `>`, `&` để đảm bảo an toàn, mặc dù `<pre>` thường hiển thị nội dung như văn bản thuần.
-  Ví dụ cho lệnh:
-  <pre><code>nmap -sV -p 80,443 example.com</code></pre>
-- **Mã inline**: Sử dụng `<code>text</code>` cho các đoạn mã ngắn hoặc tên lệnh trong dòng văn bản.
-- **Nhấn mạnh**: Sử dụng `<b>text</b>` (hoặc `<strong>`) cho đậm, `<i>text</i>` (hoặc `<em>`) cho nghiêng, `<u>text</u>` (hoặc `<ins>`) cho gạch chân, `<s>text</s>` (hoặc `<strike>`, `<del>`) cho gạch ngang.
-- **Ký tự đặc biệt HTML**: Trong văn bản thông thường (ngoài thẻ `<code>` được đặt trong `<pre>`), các ký tự `<`, `>`, `&` **BẮT BUỘC** phải được escape thành `<`, `>`, `&`.
-- **Danh sách (Lists)**: Để tạo danh sách, hãy sử dụng dấu gạch đầu dòng (ví dụ: `-` hoặc `•`) hoặc số, theo sau là văn bản. Sử dụng ngắt dòng tự nhiên (ký tự `\n` trong output của bạn) để tách các mục. KHÔNG dùng thẻ `<br>`.
-  Ví dụ tạo danh sách:
-  - Mục 1
-  - Mục 2
-
-  Hoặc:
-  1. Bước một
-  2. Bước hai
-- **Liên kết (Links)**: Sử dụng `<a href="URL">văn bản hiển thị</a>`.
-- **Ngắt dòng và đoạn văn**: Sử dụng một dòng trống (hai ký tự `\n\n`) giữa các đoạn văn để tạo khoảng cách. KHÔNG dùng thẻ `<br>` hay `<p>`.
+**YÊU CẦU ĐỊNH DẠNG HTML NGHIÊM NGẶT CHO TELEGRAM:**
+1.  **Chỉ sử dụng các thẻ HTML sau**: `<b>` (hoặc `<strong>`), `<i>` (hoặc `<em>`), `<u>` (hoặc `<ins>`), `<s>` (hoặc `<strike>`, `<del>`), `<span class="tg-spoiler">` (hoặc `<tg-spoiler>`), `<a href="URL">`, `<code>`, `<pre>`.
+2.  **TUYỆT ĐỐI KHÔNG SỬ DỤNG**: các thẻ như `<html>`, `<head>`, `<body>`, `<p>`, `<div>`, `<ul>`, `<li>`, `<br>`, hoặc bất kỳ thẻ HTML nào khác không được liệt kê ở mục 1.
+3.  **Không bao gồm các comment HTML** (`<!-- ... -->`).
+4.  Toàn bộ phản hồi phải là một đoạn HTML hợp lệ, chỉ chứa văn bản và các thẻ được phép.
+5.  **Escape ký tự HTML**: Trong văn bản thông thường (bên ngoài `<code>` trong `<pre>`), các ký tự `<`, `>`, `&` **BẮT BUỘC** phải được escape thành `<`, `>`, `&`. Bên trong `<code>` (khi nằm trong `<pre>`), việc escape các ký tự này cũng được khuyến khích để đảm bảo an toàn.
+6.  **Khối mã**: Sử dụng `<pre><code>...</code></pre>`. Ví dụ: <pre><code>nmap -sV example.com</code></pre>
+7.  **Mã inline**: Sử dụng `<code>tên_lệnh</code>`.
+8.  **Danh sách**: Dùng dấu gạch đầu dòng (`- ` hoặc `• `) hoặc số (`1. `) ở đầu mỗi mục, sau đó là văn bản. Kết thúc mỗi mục bằng một ký tự xuống dòng (`\n`).
+    Ví dụ:
+    - Mục một
+    - Mục hai
+9.  **Đoạn văn**: Tách các đoạn văn bằng một dòng trống (hai ký tự `\n\n`).
+10. **Luôn bao gồm ghi chú sau ở cuối câu trả lời của bạn, định dạng bằng thẻ <i>**: "<i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), vui lòng kiểm chứng thông tin.</i>"
 
 Ngữ cảnh công cụ:
 {context}
 
 Câu hỏi của người dùng: {question}
 
-Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hướng dẫn và thẻ đã liệt kê ở trên):
+Câu trả lời (tiếng Việt, tuân thủ nghiêm ngặt các quy tắc định dạng HTML cho Telegram ở trên):
 """
         rag_prompt = ChatPromptTemplate.from_template(html_template_string)
 
@@ -203,7 +191,7 @@ Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hư�
             | llm
             | StrOutputParser()
         )
-        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode - restricted tags).")
+        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode - stricter rules).")
 
     async def ask_question(self, query: str) -> str:
         if self.rag_chain is None:
@@ -213,7 +201,8 @@ Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hư�
             )
         try:
             response = await self.rag_chain.ainvoke(query)
-            return response 
+            # Thêm strip() ở đây để loại bỏ khoảng trắng thừa từ LLM
+            return response.strip() 
         except Exception as e:
             logger.error(f"Error during RAG chain execution for query '{query}': {e}", exc_info=True)
             error_detail = str(e)[:150] 

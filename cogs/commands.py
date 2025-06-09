@@ -1,12 +1,11 @@
 # telegram_kali_bot/cogs/commands.py
-
 import logging
 from telegram import Update, error as telegram_error 
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 import re 
-import html # Để escape HTML
-
+import html 
+import bleach
 from cogs.translate import TranslationService
 from cogs.kali_rag import KaliRAGService
 
@@ -15,15 +14,8 @@ logger = logging.getLogger(__name__)
 translation_service_instance: TranslationService = None
 kali_rag_service_instance: KaliRAGService = None
 
-# Hàm trợ giúp để escape ký tự đặc biệt cho HTML
 def _escape_html(text: str, escape_quotes: bool = True) -> str:
-    """Escapes special characters for Telegram's HTML parse_mode."""
-    # Loại bỏ các thẻ <p> và thay </p> bằng xuống dòng
-    text = re.sub(r'<p\s*>', '', text)
-    text = re.sub(r'</p\s*>', '\n', text)
     return html.escape(str(text), quote=escape_quotes)
-
-
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_name = update.effective_user.first_name
@@ -33,10 +25,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Chào!", parse_mode=ParseMode.HTML) # HTML đơn giản
+    await update.message.reply_text("Chào!", parse_mode=ParseMode.HTML)
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Pong!", parse_mode=ParseMode.HTML) # HTML đơn giản
+    await update.message.reply_text("Pong!", parse_mode=ParseMode.HTML)
 
 async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text_to_translate = ' '.join(context.args)
@@ -63,7 +55,6 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     try:
         translated_text = await translation_service_instance.translate_text(text_to_translate)
-        # Kết quả dịch đã an toàn để hiển thị trong <pre>
         response_message_html = f"Kết quả thông dịch:\n\n<pre>{_escape_html(translated_text)}</pre>"
         await update.message.reply_html(response_message_html) 
     except Exception as e:
@@ -75,7 +66,7 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
-        example_command_html = f"<code>/ask_kali cách sử dụng nmap để quét port.</code>"
+        example_command_html = f"<code>/ask_kali <câu hỏi của bạn></code>"
         await update.message.reply_text(
             f"Vui lòng cung cấp câu hỏi. Ví dụ: {example_command_html}", 
             parse_mode=ParseMode.HTML
@@ -85,7 +76,7 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = " ".join(context.args)
     await update.message.reply_text(
         f"Đang tìm kiếm gợi ý cho: <i>{_escape_html(query)}</i>...", 
-        parse_mode=ParseMode.HTML # Đã đổi sang HTML
+        parse_mode=ParseMode.HTML
     )
 
     if kali_rag_service_instance is None or kali_rag_service_instance.rag_chain is None:
@@ -96,39 +87,77 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.error("KaliRAGService instance not initialized or RAG chain is None for ask_kali_command.")
         return
 
-    response_html = "" 
+    raw_response_html = "" 
+    cleaned_html = ""
     try:
-        # LLM giờ sẽ trả về HTML
-        response_html = await kali_rag_service_instance.ask_question(query)
-        logger.info(f"LLM Raw HTML Response for query '{_escape_html(query)}':\n---\n{response_html}\n---")
-        if "<br>" in response_html:
-            response_html = response_html.replace("<br>", "\n")
-        await update.message.reply_text(response_html, parse_mode=ParseMode.HTML) 
+        raw_response_html = await kali_rag_service_instance.ask_question(query)
+        raw_response_html = raw_response_html.strip()
+        logger.info(f"LLM Raw HTML (before bleaching) for query '{_escape_html(query)}':\n---\n{raw_response_html}\n---")
+
+        ALLOWED_TAGS = ['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 
+                        'span', 'tg-spoiler', 'a', 'code', 'pre']
+        ALLOWED_ATTRIBUTES = {
+            'a': ['href'],
+            'span': ['class'], 
+            'tg-spoiler': [] 
+        }
         
+        # Clean the HTML from LLM
+        cleaned_html = bleach.clean(raw_response_html,
+                                    tags=ALLOWED_TAGS,
+                                    attributes=ALLOWED_ATTRIBUTES,
+                                    strip=True, 
+                                    strip_comments=True)
+        
+        cleaned_html = re.sub(r'<br\s*/?>', '\n', cleaned_html, flags=re.IGNORECASE)
+        cleaned_html = re.sub(r'<p\s*[^>]*>', '', cleaned_html, flags=re.IGNORECASE)
+        cleaned_html = re.sub(r'</p\s*>', '\n\n', cleaned_html, flags=re.IGNORECASE)
+        cleaned_html = cleaned_html.strip()
+        if cleaned_html != raw_response_html:
+             logger.info(f"LLM HTML Response (after bleaching and cleaning) for query '{_escape_html(query)}':\n---\n{cleaned_html}\n---")
+        await update.message.reply_text(cleaned_html, parse_mode=ParseMode.HTML) 
     except telegram_error.BadRequest as e_tg_bad:
         logger.error(
-            f"Telegram BadRequest sending LLM HTML response. Query: '{_escape_html(query)}'. LLM Response was:\n---\n{response_html}\n---\nError: {e_tg_bad}", 
+            f"Telegram BadRequest sending LLM HTML response. Query: '{_escape_html(query)}'. "
+            f"Raw HTML was:\n---\n{raw_response_html}\n---\nCleaned HTML was:\n---\n{cleaned_html}\n---\nError: {e_tg_bad}", 
             exc_info=True
         )
-        # Nếu LLM vẫn tạo HTML không hợp lệ, thông báo lỗi chung
-        user_error_message = _escape_html(f"Đã xảy ra lỗi khi hiển thị kết quả từ AI do vấn đề định dạng HTML.\nChi tiết kỹ thuật: {str(response_html)[:100]}")
-        await update.message.reply_text(user_error_message, parse_mode=ParseMode.HTML)
+        try:
+            plain_text_from_cleaned = re.sub(r'<[^>]+>', '', cleaned_html if cleaned_html else raw_response_html)
+            plain_text_from_cleaned = html.unescape(plain_text_from_cleaned).strip()
+
+            if plain_text_from_cleaned:
+                await update.message.reply_text(
+                    f"Lỗi hiển thị định dạng HTML từ AI. Nội dung thuần:\n{_escape_html(plain_text_from_cleaned)}",
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                await update.message.reply_text(
+                     _escape_html(f"Đã xảy ra lỗi khi hiển thị kết quả từ AI. Chi tiết kỹ thuật: {str(e_tg_bad)[:80]}"),
+                     parse_mode=ParseMode.HTML
+                )
+        except Exception as e_final_fallback:
+            logger.error(f"Error sending plain text fallback: {e_final_fallback}", exc_info=True)
+            await update.message.reply_text(
+                _escape_html("Đã có lỗi nghiêm trọng khi hiển thị phản hồi từ AI. Vui lòng thử lại sau."),
+                parse_mode=ParseMode.HTML
+            )
 
     except Exception as e:
         logger.error(f"Lỗi không xác định khi gọi Kali RAG service for query '{_escape_html(query)}': {e}", exc_info=True)
         error_detail = str(e)[:100] 
         user_error_message = _escape_html(f"Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.\nChi tiết: {error_detail}")
-        await update.message.reply_text(response_html)
+        await update.message.reply_text(user_error_message, parse_mode=ParseMode.HTML)
 
 async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message.text and update.message.text.startswith('/'): 
         return 
         
     echo_reply_text_html = (
-        "Tôi là bot dịch thuật và gợi ý lệnh pentest.\n"
-        "Vui lòng sử dụng:\n"
-        "  • <code>/translate &lt;văn bản của bạn&gt;</code> để dịch.\n"
-        "  • <code>/ask_kali &lt;câu hỏi của bạn&gt;</code> để hỏi về công cụ Kali.\n"
+        "Tôi là bot dịch thuật và gợi ý lệnh pentest.<br>"
+        "Vui lòng sử dụng:<br>"
+        "  • <code>/translate <văn bản của bạn></code> để dịch.<br>"
+        "  • <code>/ask_kali <câu hỏi của bạn></code> để hỏi về công cụ Kali.<br>"
         "  • Hoặc <code>/help</code> để biết thêm."
     )
     await update.message.reply_text(echo_reply_text_html, parse_mode=ParseMode.HTML)
@@ -144,9 +173,9 @@ Dưới đây là các lệnh bạn có thể sử dụng:
   • <code>/help</code> - Hiển thị hướng dẫn sử dụng bot.
 
 <b>Chức năng chính:</b>
-  • <code>/translate &lt;văn bản&gt;</code> - Dịch văn bản của bạn (Việt-Anh, Anh-Việt, hoặc sửa ngữ pháp tiếng Anh).
+  • <code>/translate <văn bản></code> - Dịch văn bản của bạn (Việt-Anh, Anh-Việt, hoặc sửa ngữ pháp tiếng Anh).
      <i>Ví dụ: <code>/translate hello world</code></i>
-  • <code>/ask_kali &lt;câu hỏi&gt;</code> - Gợi ý công cụ Kali Linux và lệnh pentest dựa trên mô tả của bạn.
+  • <code>/ask_kali <câu hỏi></code> - Gợi ý công cụ Kali Linux và lệnh pentest dựa trên mô tả của bạn.
      <i>Ví dụ: <code>/ask_kali làm sao để quét cổng UDP bằng nmap</code></i>
 
 Hãy gõ <code>/</code> và chọn lệnh từ danh sách gợi ý, hoặc gõ trực tiếp lệnh bạn muốn!
