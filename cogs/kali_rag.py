@@ -175,8 +175,6 @@ Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên
 `<code>text</code>` (cho mã inline)
 `<pre>text</pre>` (cho khối mã, có thể lồng `<code>` bên trong: `<pre><code>...</code></pre>`)
 
-**TUYỆT ĐỐI KHÔNG SỬ DỤNG THẺ `<p>` HOẶC `<div>`.** Thay vào đó, để tạo khoảng cách giữa các đoạn văn, bạn có thể sử dụng hai thẻ ngắt dòng liên tiếp (`<br><br>`) hoặc dựa vào ngắt dòng tự nhiên giữa các khối văn bản.
-
 - **Khối mã (Code Blocks)**: Sử dụng thẻ `<pre><code>...</code></pre>` để hiển thị các lệnh hoặc ví dụ mã. Bên trong `<code>`, các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&`.
   Ví dụ cho lệnh:
   <pre><code>nmap -sV -p 80,443 example.com</code></pre>
@@ -190,14 +188,15 @@ Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên
   1. Bước một<br>
   2. Bước hai<br>
 - **Liên kết (Links)**: Sử dụng `<a href="URL">văn bản hiển thị</a>`.
-- **Ngắt dòng**: Sử dụng thẻ `<br>` để ngắt dòng một cách tường minh khi cần thiết. Để tạo khoảng cách giữa các đoạn, sử dụng `<br><br>`.
+- **Ngắt dòng**: Sử dụng thẻ \\n để ngắt dòng một cách tường minh khi cần thiết.
+- **Cấm dùng**: cấm dùng thẻ `<p>`
 
 Ngữ cảnh công cụ:
 {context}
 
 Câu hỏi của người dùng: {question}
 
-Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các thẻ đã liệt kê, KHÔNG dùng thẻ <p>):
+Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các thẻ đã liệt kê):
 """
         rag_prompt = ChatPromptTemplate.from_template(html_template_string)
 
@@ -207,4 +206,20 @@ Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các thẻ
             | llm
             | StrOutputParser()
         )
-        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode - restricted tags, no <p>).")
+        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode - restricted tags).")
+
+    async def ask_question(self, query: str) -> str:
+        if self.rag_chain is None:
+            return _escape_html_internal(
+                "Tính năng gợi ý công cụ Kali hiện không khả dụng. "
+                "Vui lòng kiểm tra cấu hình bot hoặc thông báo cho admin."
+            )
+        try:
+            response = await self.rag_chain.ainvoke(query)
+            return response 
+        except Exception as e:
+            logger.error(f"Error during RAG chain execution for query '{query}': {e}", exc_info=True)
+            error_detail = str(e)[:150] 
+            return _escape_html_internal(
+                f"Đã xảy ra lỗi khi tìm kiếm gợi ý. Vui lòng thử lại sau. Lỗi: {error_detail}"
+            )
