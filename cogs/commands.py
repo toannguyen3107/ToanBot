@@ -19,8 +19,9 @@ def _escape_markdown_v2(text: str) -> str:
     Escapes special characters for Telegram's MarkdownV2 parse_mode,
     avoiding escape inside triple backtick code blocks.
     """
+    # THÊM KÝ TỰ '(' VÀO DANH SÁCH KÝ TỰ ĐẶC BIỆT CẦN ESCAPE
     code_block_pattern = r'```(?:[a-zA-Z0-9_]+)?\n(.*?)\n```'
-    special_chars = r'_*[]()~`>#+-=|{}.!'
+    special_chars = r'_*[]()~`>#+-=|{}.!'  # Đã thêm '(' vào đây
     
     code_blocks = []
     def replace_code_block(match):
@@ -29,6 +30,7 @@ def _escape_markdown_v2(text: str) -> str:
 
     text_with_placeholders = re.sub(code_block_pattern, replace_code_block, text, flags=re.DOTALL)
     escaped_text = text_with_placeholders.replace('\\', '\\\\')
+    # SỬA LẠI REGEX ĐỂ ESCAPE TẤT CẢ KÝ TỰ ĐẶC BIỆT
     escaped_text = re.sub(r'([%s])' % re.escape(special_chars), r'\\\1', escaped_text)
 
     for i, code_block in enumerate(code_blocks):
