@@ -120,6 +120,7 @@ class KaliRAGService:
                         vectorstore = Chroma(client=client, collection_name=collection_name, embedding_function=embeddings, persist_directory=CHROMA_DB_DIR)
                 except Exception: 
                     logger.warning(f"[{time.strftime('%H:%M:%S')}] Collection '{collection_name}' not found or error accessing. Will attempt to create new vectorstore from documents.")
+                    # If collection not found, vectorstore remains None, new one will be created.
                     pass 
             except Exception as load_err:
                 logger.warning(f"[{time.strftime('%H:%M:%S')}] Error while trying to load/check existing Chroma DB: {load_err}. Forcing recreation.")
@@ -135,6 +136,7 @@ class KaliRAGService:
                     logger.info(f"[{time.strftime('%H:%M:%S')}] Successfully removed old Chroma DB directory.")
                 except Exception as e_rm:
                     logger.error(f"[{time.strftime('%H:%M:%S')}] Failed to remove old Chroma DB: {e_rm}.", exc_info=True)
+            vectorstore = None # Ensure it's recreated
 
         if vectorstore is None: 
             try:
@@ -184,27 +186,52 @@ Câu trả lời (HTML hoặc chuỗi [NO_CONTEXT_DATA_FOUND]):
         )
         logger.info("RAG Chain Phase 1 initialized.")
 
+        # MODIFIED html_template_phase2
         html_template_phase2 = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt dựa trên kiến thức chung của bạn.
-Hãy trả lời câu hỏi của người dùng một cách chi tiết và hữu ích.
+Nhiệm vụ của bạn là trả lời câu hỏi của người dùng một cách chi tiết và hữu ích.
 
 **YÊU CẦU ĐỊNH DẠNG HTML NGHIÊM NGẶT CHO TELEGRAM:**
-1.  **Chỉ sử dụng các thẻ HTML sau**: `<b>` (hoặc `<strong>`), `<i>` (hoặc `<em>`), `<u>` (hoặc `<ins>`), `<s>` (hoặc `<strike>`, `<del>`), `<span class="tg-spoiler">` (hoặc `<tg-spoiler>`), `<a href="URL">`, `<code>`, `<pre>`.
-2.  **TUYỆT ĐỐI KHÔNG SỬ DỤNG**: các thẻ như `<html>`, `<head>`, `<body>`, `<p>`, `<div>`, `<ul>`, `<li>`, `<br>`, hoặc bất kỳ thẻ HTML nào khác không được liệt kê ở mục 1.
-3.  **Không bao gồm các comment HTML** (`<!-- ... -->`).
-4.  Toàn bộ phản hồi phải là một đoạn HTML hợp lệ, chỉ chứa văn bản và các thẻ được phép.
-5.  **Escape ký tự HTML**: Trong văn bản thông thường (bên ngoài `<code>` trong `<pre>`), các ký tự `<`, `>`, `&` **BẮT BUỘC** phải được escape thành `<`, `>`, `&`. Bên trong `<code>` (khi nằm trong `<pre>`), việc escape các ký tự này cũng được khuyến khích để đảm bảo an toàn.
-6.  **Khối mã**: Sử dụng `<pre><code>...</code></pre>`. Ví dụ: <pre><code>nmap -sV example.com</code></pre>
-7.  **Mã inline**: Sử dụng `<code>tên_lệnh</code>`.
-8.  **Danh sách**: Dùng dấu gạch đầu dòng (`- ` hoặc `• `) hoặc số (`1. `) ở đầu mỗi mục, sau đó là văn bản. Kết thúc mỗi mục bằng một ký tự xuống dòng (`\n`).
-    Ví dụ:
-    - Mục một
-    - Mục hai
-9.  **Đoạn văn**: Tách các đoạn văn bằng một dòng trống (hai ký tự `\n\n`).
-10. **BẮT BUỘC bao gồm ghi chú sau ở cuối câu trả lời của bạn, định dạng bằng thẻ <i>**: "<i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), không phải từ cơ sở dữ liệu thực tế, vui lòng kiểm chứng thông tin.</i>"
+1.  **TOÀN BỘ PHẢN HỒI PHẢI LÀ HTML.** Không được có văn bản thuần túy không nằm trong thẻ nào (trừ khi đó là nội dung của một thẻ).
+2.  **Chỉ sử dụng các thẻ HTML sau**: `<b>` (hoặc `<strong>`), `<i>` (hoặc `<em>`), `<u>` (hoặc `<ins>`), `<s>` (hoặc `<strike>`, `<del>`), `<span class="tg-spoiler">` (hoặc `<tg-spoiler>`), `<a href="URL">`, `<code>`, `<pre>`.
+3.  **TUYỆT ĐỐI KHÔNG SỬ DỤNG**: các thẻ như `<html>`, `<head>`, `<body>`, `<p>`, `<div>`, `<ul>`, `<li>`, `<br>`, hoặc bất kỳ thẻ HTML nào khác không được liệt kê ở mục 2.
+4.  **Không bao gồm các comment HTML** (`<!-- ... -->`).
+5.  **Escape ký tự HTML**:
+    - Trong văn bản thông thường (bên ngoài `<code>` và `<pre>`): `&` thành `&`, `<` thành `<`, `>` thành `>`.
+    - Bên trong `<code>` (khi không nằm trong `<pre>`): cũng nên escape các ký tự này.
+    - Bên trong thẻ `<pre>` (và `<code>` bên trong `<pre>`): escape `&` thành `&`, `<` thành `<`, `>` thành `>` để đảm bảo chúng được hiển thị dưới dạng ký tự chữ, không phải thẻ HTML.
+6.  **Khối mã**: Sử dụng `<pre><code>...nội dung mã đã được escape...</code></pre>`. Nội dung bên trong `<pre><code>` sẽ giữ nguyên định dạng (preserve whitespace and newlines).
+    Ví dụ: <pre><code>nmap -sV <target_ip></code></pre>
+7.  **Mã inline**: Sử dụng `<code>tên_lệnh_đã_escape</code>`. Ví dụ: Sử dụng lệnh `<code>nmap</code>`.
+8.  **Tạo danh sách hoặc mục**:
+    - Vì thẻ `<ul>` và `<li>` không được phép, hãy tạo danh sách bằng cách bắt đầu mỗi mục bằng một ký tự như `• ` (hoặc `- `, `* `) hoặc số (`1. `), theo sau là văn bản.
+    - Mỗi mục danh sách nên là một dòng riêng, kết thúc bằng `\n`.
+    - Các thẻ định dạng như `<b>`, `<i>`, `<code>` có thể được sử dụng bên trong văn bản của mục.
+    Ví dụ (đây là cách bạn nên cấu trúc các dòng text trong phản hồi HTML của bạn):
+    • Mục <b>quan trọng</b> đầu tiên.\n
+    • Mục thứ hai với <i>chi tiết</i> và mã <code>some_code</code>.\n
+      Dòng này là phần tiếp theo của mục thứ hai, thụt vào để rõ ràng (sử dụng dấu cách).\n
+    1. Mục được đánh số thứ nhất.\n
+    2. Mục được đánh số thứ hai.
+9.  **Đoạn văn và xuống dòng**:
+    - Tách các đoạn văn bằng một dòng trống (hai ký tự `\n\n`).
+    - Sử dụng một ký tự `\n` để xuống dòng đơn.
+    - Toàn bộ văn bản, bao gồm cả các ký tự xuống dòng này, phải là một phần của chuỗi HTML hợp lệ.
+10. **Ví dụ về phản hồi HTML hoàn chỉnh**:
+    Giả sử câu hỏi là "cách dùng nmap quét cổng". Phản hồi có thể là (đây là một chuỗi HTML duy nhất):
+    <b>Nmap (Network Mapper)</b> là một công cụ mạnh mẽ để quét mạng.\n\n
+    Để quét các cổng phổ biến trên một mục tiêu, bạn có thể dùng:\n
+    <pre><code>nmap -sV example.com</code></pre>\n
+    Trong đó:\n
+    • <code>-sV</code>: Dùng để phát hiện phiên bản dịch vụ.\n
+    • <code>example.com</code>: Là mục tiêu của bạn (có thể là IP hoặc hostname).\n\n
+    Bạn có thể tìm hiểu thêm tại <a href="https://nmap.org">trang chủ Nmap</a>.\n\n
+    <i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), không phải từ cơ sở dữ liệu thực tế, vui lòng kiểm chứng thông tin.</i>
+
+11. **BẮT BUỘC bao gồm ghi chú sau ở cuối câu trả lời của bạn, định dạng chính xác bằng thẻ <i> như ví dụ trên**: "<i>ĐÂY LÀ THÔNG TIN ĐƯỢC GENERATE TỪ LLM (Gemini), không phải từ cơ sở dữ liệu thực tế, vui lòng kiểm chứng thông tin.</i>"
 
 Câu hỏi của người dùng: {question}
 
-Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hướng dẫn, và có ghi chú ở cuối):
+Câu trả lời (TUYỆT ĐỐI LÀ HTML tiếng Việt, tuân thủ MỌI quy tắc trên, và có ghi chú ở cuối):
 """
         prompt_phase2 = ChatPromptTemplate.from_template(html_template_phase2)
         
@@ -220,15 +247,15 @@ Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hư�
         no_context_marker = "[NO_CONTEXT_DATA_FOUND]"
 
         if not self.rag_chain_phase1:
+            logger.error("RAG Chain Phase 1 is not initialized in ask_question.")
             return _escape_html_internal("Lỗi: RAG Chain Pha 1 chưa được khởi tạo.")
 
-        logger.info(f"Phase 1 RAG: Querying for '{query}'")
+        logger.info(f"Phase 1 RAG: Querying for '{_escape_html_internal(query)}'") # Escape query for logging
         response_phase1 = await self.rag_chain_phase1.ainvoke(query)
         response_phase1 = response_phase1.strip()
         
-        # SỬA LỖI F-STRING Ở ĐÂY
-        log_response_preview = response_phase1[:200].replace('\n', ' ')
-        logger.info(f"Phase 1 RAG: Response: '{log_response_preview}...'")
+        log_response_preview_p1 = response_phase1.replace('\n', ' ')[:200]
+        logger.info(f"Phase 1 RAG: Response: '{log_response_preview_p1}...'") # User's existing log format
 
         if response_phase1 != no_context_marker:
             logger.info("Phase 1 RAG: Answer found in context.")
@@ -236,7 +263,14 @@ Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hư�
         else:
             logger.info("Phase 1 RAG: No context found. Proceeding to Phase 2 (LLM only).")
             if not self.llm_chain_phase2:
+                logger.error("LLM Chain Phase 2 is not initialized in ask_question.")
                 return _escape_html_internal("Lỗi: LLM Chain Pha 2 chưa được khởi tạo.")
             
+            logger.info(f"Phase 2 LLM: Querying for '{_escape_html_internal(query)}'") # Escape query for logging
             response_phase2 = await self.llm_chain_phase2.ainvoke({"question": query})
-            return response_phase2.strip()
+            response_phase2_stripped = response_phase2.strip()
+            
+            log_response_preview_p2 = response_phase2_stripped.replace('\n', ' ')[:300]
+            logger.info(f"Phase 2 LLM: Raw Response: '{log_response_preview_p2}...'") # Log raw response from Phase 2
+            
+            return response_phase2_stripped
