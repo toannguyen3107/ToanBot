@@ -159,7 +159,7 @@ class KaliRAGService:
         
         # Ensure { and } meant for display are {{ and }} in the f-string.
         # Ensure {context} and {question} are the actual placeholders for LangChain.
-        template_string = f"""
+        template_string = """
         Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
         Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
         Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
@@ -180,16 +180,16 @@ class KaliRAGService:
         - **Liên kết (Links)**: Sử dụng định dạng `[văn bản hiển thị](URL)`. Ví dụ: `[Trang chủ Kali](https://www.kali.org/)`. Tránh URL trần.
 
         Ngữ cảnh công cụ:
-        {{context_placeholder}}
+        {context_placeholder}
         
-        Câu hỏi của người dùng: {{question_placeholder}}
+        Câu hỏi của người dùng: {question_placeholder}
 
         Câu trả lời (tiếng Việt, định dạng MarkdownV2):
         """
-        final_template_string = template_string.replace("{{context_placeholder}}", "{context}")
-        final_template_string = final_template_string.replace("{{question_placeholder}}", "{question}")
+        # final_template_string = template_string.replace("{{context_placeholder}}", "{context}")
+        # final_template_string = final_template_string.replace("{{question_placeholder}}", "{question}")
 
-        rag_prompt = ChatPromptTemplate.from_template(final_template_string)
+        rag_prompt = ChatPromptTemplate.from_template(template_string)
 
         self.rag_chain = (
             {"context": retriever, "question": RunnablePassthrough()}
