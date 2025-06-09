@@ -13,15 +13,17 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
+import html # Để escape HTML
 
 logger = logging.getLogger(__name__)
 
 DATA_FILE = "data/kali_tools_data.json"
 CHROMA_DB_DIR = "./chroma_db"
 
-def _escape_markdown_v2_internal(text: str) -> str:
-    escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
+
+def _escape_html_internal(text: str) -> str:
+    return html.escape(str(text))
+
 
 class KaliRAGService:
     def __init__(self, google_api_key: str):
@@ -41,6 +43,7 @@ class KaliRAGService:
             logger.warning("GOOGLE_API_KEY not provided. RAG feature will be unavailable.")
 
     def _load_and_prepare_data(self, filepath: str) -> list[Document]:
+        # ... (Giữ nguyên hàm này) ...
         logger.info(f"[{time.strftime('%H:%M:%S')}] Loading data for RAG from {filepath}...")
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -65,7 +68,7 @@ class KaliRAGService:
             ]
             if 'commands' in item and item['commands']:
                 commands_str = "Commands and Usage Examples:\n"
-                for cmd_item in item['commands']: # Renamed to avoid conflict with outer 'cmd' if any
+                for cmd_item in item['commands']:
                     sub_command = cmd_item.get('sub_command', 'N/A')
                     usage_example = cmd_item.get('usage_example', 'No usage example.')
                     if usage_example.strip() and usage_example != 'No usage example.':
@@ -88,6 +91,7 @@ class KaliRAGService:
         return documents
 
     def _initialize_rag_chain(self):
+        # ... (Phần load documents và khởi tạo embeddings, vectorstore giữ nguyên) ...
         documents = self._load_and_prepare_data(DATA_FILE)
         if not documents:
             logger.error("RAG Initialization failed: No documents available for RAG.")
@@ -116,7 +120,7 @@ class KaliRAGService:
                     else:
                         logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded existing Chroma collection '{collection_name}' with {collection.count()} documents.")
                         vectorstore = Chroma(client=client, collection_name=collection_name, embedding_function=embeddings, persist_directory=CHROMA_DB_DIR)
-                except Exception: # Catches errors like collection not found
+                except Exception: 
                     logger.warning(f"[{time.strftime('%H:%M:%S')}] Collection '{collection_name}' not found or error accessing. Will attempt to create new vectorstore from documents.")
                     pass 
             except Exception as load_err:
@@ -157,39 +161,36 @@ class KaliRAGService:
         retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=self.google_api_key)
         
-        # Ensure { and } meant for display are {{ and }} in the f-string.
-        # Ensure {context} and {question} are the actual placeholders for LangChain.
-        template_string = """
-        Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
-        Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
-        Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
-        
-        **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp *MarkdownV2 của Telegram*.
-        - **Khối mã (Code Blocks)**: Để hiển thị các lệnh, cấu hình, hoặc ví dụ mã, hãy sử dụng khối mã. Bắt đầu bằng ba dấu backtick (```) theo sau là gợi ý ngôn ngữ (ví dụ: ```bash hoặc ```text hoặc ```json) trên một dòng, tiếp theo là mã của bạn, và kết thúc bằng ba dấu backtick (```) trên một dòng riêng.
-          Ví dụ cho lệnh:
-          ```bash
-          nmap -sV -p 80,443 example.com
-          ```
-          Ví dụ cho văn bản/output mẫu:
-          ```text
-          Some tool output here...
-          ```
-        - **Nhấn mạnh (Bold/Italics)**: Sử dụng dấu sao cho *văn bản đậm* (`*text*`) và dấu gạch dưới cho _văn bản nghiêng_ (`_text_`) một cách tiết chế, chỉ khi thực sự cần làm nổi bật một thuật ngữ hoặc khái niệm quan trọng. Tránh lạm dụng.
-        - **Ký tự đặc biệt**: Telegram MarkdownV2 sử dụng các ký tự đặc biệt: `_*[]()~`>#+-=|{{}}{{'}}'.!`. Nếu bạn cần hiển thị các ký tự này theo nghĩa đen (không phải là một phần của định dạng Markdown), chúng phải được thoát bằng dấu gạch chéo ngược (`\\`). Ví dụ, để hiển thị `example.com`, bạn sẽ viết `example\\.com`. Hãy cố gắng tạo ra MarkdownV2 hợp lệ và tự thoát các ký tự cần thiết trong văn bản thường, đặc biệt là các dấu chấm `.` và dấu than `!` ở cuối câu hoặc khi chúng đứng một mình.
-        - **Danh sách (Lists)**: Nếu bạn muốn tạo danh sách, hãy sử dụng gạch đầu dòng (ví dụ: `\\- Mục 1`, `\\* Mục A`) hoặc số theo sau là dấu chấm (`1\\. Bước một`). Đảm bảo có khoảng trắng sau ký hiệu danh sách.
-        - **Liên kết (Links)**: Sử dụng định dạng `[văn bản hiển thị](URL)`. Ví dụ: `[Trang chủ Kali](https://www.kali.org/)`. Tránh URL trần.
+        # CẬP NHẬT PROMPT ĐỂ YÊU CẦU HTML
+        html_template_string = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
+Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
+Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
 
-        Ngữ cảnh công cụ:
-        {context}
-        
-        Câu hỏi của người dùng: {question}
+**QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp **HTML** của Telegram.
+- **Khối mã (Code Blocks)**: Sử dụng thẻ `<pre><code>...</code></pre>` để hiển thị các lệnh, cấu hình, hoặc ví dụ mã. Bên trong `<code>`, các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&` tương ứng.
+  Ví dụ cho lệnh:
+  <pre><code>nmap -sV -p 80,443 example.com</code></pre>
+  Ví dụ cho văn bản/output mẫu:
+  <pre><code>Some tool output <tag> here...</code></pre>
+- **Nhấn mạnh (Bold/Italics)**: Sử dụng thẻ `<b>văn bản đậm</b>` cho văn bản đậm và `<i>văn bản nghiêng</i>` cho văn bản nghiêng. Sử dụng tiết chế.
+- **Ký tự đặc biệt HTML**: Trong văn bản thông thường (ngoài thẻ `<code>`), các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&`. Dấu ngoặc kép `"` có thể được escape thành `"`.
+- **Danh sách (Lists)**: Sử dụng thẻ `<ul>` (danh sách không thứ tự) hoặc `<ol>` (danh sách có thứ tự) với các thẻ `<li>` cho mỗi mục.
+  Ví dụ:
+  <ul>
+    <li>Mục 1</li>
+    <li>Mục 2</li>
+  </ul>
+- **Liên kết (Links)**: Sử dụng thẻ `<a>` với thuộc tính `href`. Ví dụ: `<a href="https://www.kali.org/">Trang chủ Kali</a>`.
+- **Ngắt dòng**: Sử dụng thẻ `<br>` để ngắt dòng nếu cần, hoặc để các khối như `<p>`, `<ul>`, `<pre>` tự xử lý ngắt dòng.
 
-        Câu trả lời (tiếng Việt, định dạng MarkdownV2):
-        """
-        # final_template_string = template_string.replace("{{context_placeholder}}", "{context}")
-        # final_template_string = final_template_string.replace("{{question_placeholder}}", "{question}")
+Ngữ cảnh công cụ:
+{context}
 
-        rag_prompt = ChatPromptTemplate.from_template(template_string)
+Câu hỏi của người dùng: {question}
+
+Câu trả lời (tiếng Việt, định dạng HTML):
+"""
+        rag_prompt = ChatPromptTemplate.from_template(html_template_string)
 
         self.rag_chain = (
             {"context": retriever, "question": RunnablePassthrough()}
@@ -197,20 +198,21 @@ class KaliRAGService:
             | llm
             | StrOutputParser()
         )
-        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully.")
+        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode).")
 
     async def ask_question(self, query: str) -> str:
         if self.rag_chain is None:
-            return _escape_markdown_v2_internal(
+            return _escape_html_internal( # Sử dụng escape HTML cho thông báo lỗi
                 "Tính năng gợi ý công cụ Kali hiện không khả dụng. "
                 "Vui lòng kiểm tra cấu hình bot hoặc thông báo cho admin."
             )
         try:
             response = await self.rag_chain.ainvoke(query)
+            # LLM bây giờ trả về HTML, không cần escape nữa ở đây
             return response 
         except Exception as e:
             logger.error(f"Error during RAG chain execution for query '{query}': {e}", exc_info=True)
             error_detail = str(e)[:150] 
-            return _escape_markdown_v2_internal(
+            return _escape_html_internal( # Sử dụng escape HTML cho thông báo lỗi
                 f"Đã xảy ra lỗi khi tìm kiếm gợi ý. Vui lòng thử lại sau. Lỗi: {error_detail}"
             )
