@@ -140,8 +140,8 @@ async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     echo_reply_text_html = (
         "Tôi là bot dịch thuật và gợi ý lệnh pentest.<br>"
         "Vui lòng sử dụng:<br>"
-        "  • <code>/translate <văn bản của bạn></code> để dịch.<br>"
-        "  • <code>/ask_kali <câu hỏi của bạn></code> để hỏi về công cụ Kali.<br>"
+        "  • <code>/translate &lt;văn bản của bạn&gt;</code> để dịch.<br>"
+        "  • <code>/ask_kali &lt;câu hỏi của bạn&gt;</code> để hỏi về công cụ Kali.<br>"
         "  • Hoặc <code>/help</code> để biết thêm."
     )
     await update.message.reply_text(echo_reply_text_html, parse_mode=ParseMode.HTML)
@@ -157,9 +157,9 @@ Dưới đây là các lệnh bạn có thể sử dụng:
   • <code>/help</code> - Hiển thị hướng dẫn sử dụng bot.
 
 <b>Chức năng chính:</b>
-  • <code>/translate <văn bản></code> - Dịch văn bản của bạn (Việt-Anh, Anh-Việt, hoặc sửa ngữ pháp tiếng Anh).
+  • <code>/translate &lt;văn bản&gt;</code> - Dịch văn bản của bạn (Việt-Anh, Anh-Việt, hoặc sửa ngữ pháp tiếng Anh).
      <i>Ví dụ: <code>/translate hello world</code></i>
-  • <code>/ask_kali <câu hỏi></code> - Gợi ý công cụ Kali Linux và lệnh pentest dựa trên mô tả của bạn.
+  • <code>/ask_kali &lt;câu hỏi&gt;</code> - Gợi ý công cụ Kali Linux và lệnh pentest dựa trên mô tả của bạn.
      <i>Ví dụ: <code>/ask_kali làm sao để quét cổng UDP bằng nmap</code></i>
 
 Hãy gõ <code>/</code> và chọn lệnh từ danh sách gợi ý, hoặc gõ trực tiếp lệnh bạn muốn!
