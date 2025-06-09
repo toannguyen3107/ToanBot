@@ -66,7 +66,7 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
-        example_command_html = f"<code>/ask_kali <câu hỏi của bạn></code>"
+        example_command_html = f"<code>/ask_kali <câu hỏi của bạn></code>" # Đã sửa placeholder
         await update.message.reply_text(
             f"Vui lòng cung cấp câu hỏi. Ví dụ: {example_command_html}", 
             parse_mode=ParseMode.HTML
@@ -79,12 +79,15 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         parse_mode=ParseMode.HTML
     )
 
-    if kali_rag_service_instance is None or kali_rag_service_instance.rag_chain is None:
+    # SỬA LỖI KIỂM TRA Ở ĐÂY
+    if kali_rag_service_instance is None or \
+       kali_rag_service_instance.rag_chain_phase1 is None or \
+       kali_rag_service_instance.llm_chain_phase2 is None:
         await update.message.reply_text(
-            _escape_html("Bot RAG chưa được khởi tạo hoặc không khả dụng. Vui lòng thử lại sau hoặc thông báo cho admin."),
+            _escape_html("Bot RAG chưa được khởi tạo đúng cách hoặc không khả dụng. Vui lòng thử lại sau hoặc thông báo cho admin."),
             parse_mode=ParseMode.HTML
         )
-        logger.error("KaliRAGService instance not initialized or RAG chain is None for ask_kali_command.")
+        logger.error("KaliRAGService instance or its chains (Phase 1/2) are not initialized for ask_kali_command.")
         return
 
     raw_response_html = "" 
@@ -102,7 +105,6 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             'tg-spoiler': [] 
         }
         
-        # Clean the HTML from LLM
         cleaned_html = bleach.clean(raw_response_html,
                                     tags=ALLOWED_TAGS,
                                     attributes=ALLOWED_ATTRIBUTES,
@@ -113,9 +115,12 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         cleaned_html = re.sub(r'<p\s*[^>]*>', '', cleaned_html, flags=re.IGNORECASE)
         cleaned_html = re.sub(r'</p\s*>', '\n\n', cleaned_html, flags=re.IGNORECASE)
         cleaned_html = cleaned_html.strip()
-        if cleaned_html != raw_response_html:
+
+        if cleaned_html != raw_response_html: # Chỉ log nếu có sự thay đổi
              logger.info(f"LLM HTML Response (after bleaching and cleaning) for query '{_escape_html(query)}':\n---\n{cleaned_html}\n---")
+        
         await update.message.reply_text(cleaned_html, parse_mode=ParseMode.HTML) 
+        
     except telegram_error.BadRequest as e_tg_bad:
         logger.error(
             f"Telegram BadRequest sending LLM HTML response. Query: '{_escape_html(query)}'. "
@@ -173,9 +178,9 @@ Dưới đây là các lệnh bạn có thể sử dụng:
   • <code>/help</code> - Hiển thị hướng dẫn sử dụng bot.
 
 <b>Chức năng chính:</b>
-  • <code>/translate VAN BAN</code> - Dịch văn bản của bạn (Việt-Anh, Anh-Việt, hoặc sửa ngữ pháp tiếng Anh).
+  • <code>/translate <văn bản></code> - Dịch văn bản của bạn (Việt-Anh, Anh-Việt, hoặc sửa ngữ pháp tiếng Anh).
      <i>Ví dụ: <code>/translate hello world</code></i>
-  • <code>/ask_kali VAN BAN</code> - Gợi ý công cụ Kali Linux và lệnh pentest dựa trên mô tả của bạn.
+  • <code>/ask_kali <câu hỏi></code> - Gợi ý công cụ Kali Linux và lệnh pentest dựa trên mô tả của bạn.
      <i>Ví dụ: <code>/ask_kali làm sao để quét cổng UDP bằng nmap</code></i>
 
 Hãy gõ <code>/</code> và chọn lệnh từ danh sách gợi ý, hoặc gõ trực tiếp lệnh bạn muốn!
