@@ -37,8 +37,12 @@ def main() -> None:
     if cogs.commands.translation_service_instance.llm is None:
         logger.warning("TranslationService LLM could not be initialized. Translation feature will be unavailable.")
     cogs.commands.kali_rag_service_instance = KaliRAGService(GOOGLE_API_KEY)
-    if cogs.commands.kali_rag_service_instance.rag_chain is None:
-        logger.critical("Failed to initialize KaliRAGService. RAG feature will be unavailable.")
+    if cogs.commands.kali_rag_service_instance is None or \
+    cogs.commands.kali_rag_service_instance.rag_chain_phase1 is None or \
+    cogs.commands.kali_rag_service_instance.llm_chain_phase2 is None:
+        logger.critical("Failed to initialize one or both RAG chains in KaliRAGService. RAG feature will be critically impaired or unavailable.")
+    else:
+        logger.info("KaliRAGService and its RAG chains (Phase 1 & 2) initialized successfully.")
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", cogs.commands.start_command))
     application.add_handler(CommandHandler("hello", cogs.commands.hello_command))
