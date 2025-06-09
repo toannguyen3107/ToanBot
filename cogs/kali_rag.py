@@ -200,7 +200,7 @@ class KaliRAGService:
         rag_prompt = ChatPromptTemplate.from_template("""
         Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
         Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
-        Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
+        Nếu thông tin từ 'Ngữ cảnh công具' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế. # <--- Lỗi typo "công cụ具"
         
         **QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp *MarkdownV2 của Telegram*.
         - **Khối mã (Code Blocks)**: Để hiển thị các lệnh, cấu hình, hoặc ví dụ mã, hãy sử dụng khối mã. Bắt đầu bằng ba dấu backtick (```) theo sau là gợi ý ngôn ngữ (ví dụ: ```bash hoặc ```text hoặc ```json) trên một dòng, tiếp theo là mã của bạn, và kết thúc bằng ba dấu backtick (```) trên một dòng riêng.
@@ -213,7 +213,7 @@ class KaliRAGService:
           Some tool output here...
           ```
         - **Nhấn mạnh (Bold/Italics)**: Sử dụng dấu sao cho *văn bản đậm* (`*text*`) và dấu gạch dưới cho _văn bản nghiêng_ (`_text_`) một cách tiết chế, chỉ khi thực sự cần làm nổi bật một thuật ngữ hoặc khái niệm quan trọng. Tránh lạm dụng.
-        - **Ký tự đặc biệt**: Telegram MarkdownV2 sử dụng các ký tự đặc biệt: `_*[]()~`>#+-=|{{}}.!`. Nếu bạn cần hiển thị các ký tự này theo nghĩa đen (không phải là một phần của định dạng Markdown), chúng phải được thoát bằng dấu gạch chéo ngược (`\\`). Ví dụ, để hiển thị `example.com`, bạn sẽ viết `example\\.com`. Hãy cố gắng tạo ra MarkdownV2 hợp lệ và tự thoát các ký tự cần thiết trong văn bản thường.
+        - **Ký tự đặc biệt**: Telegram MarkdownV2 sử dụng các ký tự đặc biệt: `_*[]()~`>#+-=|{}.!`. Nếu bạn cần hiển thị các ký tự này theo nghĩa đen (không phải là một phần của định dạng Markdown), chúng phải được thoát bằng dấu gạch chéo ngược (`\\`). Ví dụ, để hiển thị `example.com`, bạn sẽ viết `example\\.com`. Hãy cố gắng tạo ra MarkdownV2 hợp lệ và tự thoát các ký tự cần thiết trong văn bản thường.
         - **Danh sách (Lists)**: Nếu bạn muốn tạo danh sách, hãy sử dụng gạch đầu dòng (ví dụ: `\\- Mục 1`, `\\* Mục A`) hoặc số theo sau là dấu chấm (`1\\. Bước một`). Đảm bảo có khoảng trắng sau ký hiệu danh sách.
         - **Liên kết (Links)**: Sử dụng định dạng `[văn bản hiển thị](URL)`. Ví dụ: `[Trang chủ Kali](https://www.kali.org/)`. Tránh URL trần.
 
