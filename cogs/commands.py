@@ -101,6 +101,8 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # LLM giờ sẽ trả về HTML
         response_html = await kali_rag_service_instance.ask_question(query)
         logger.info(f"LLM Raw HTML Response for query '{_escape_html(query)}':\n---\n{response_html}\n---")
+        if "<br>" in response_html:
+            response_html = response_html.replace("<br>", "\n")
         await update.message.reply_text(response_html, parse_mode=ParseMode.HTML) 
         
     except telegram_error.BadRequest as e_tg_bad:
