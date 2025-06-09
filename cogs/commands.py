@@ -58,46 +58,59 @@ def _escape_markdown_v2(text: str) -> str:
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_name = update.effective_user.first_name
-    await update.message.reply_text(f"Chào mừng {user_name} đến với bot hổ trợ công việc!")
+    # For simple messages like this, MarkdownV2 is not strictly necessary unless you plan to add formatting.
+    # If using plain text, ParseMode is not needed, or explicitly use None.
+    # For consistency if other messages use MarkdownV2, escape user_name if it could contain special chars.
+    await update.message.reply_text(f"Chào mừng {_escape_markdown_v2(user_name)} đến với bot hổ trợ công việc\\!", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Chào!")
+    await update.message.reply_text("Chào\\!", parse_mode=ParseMode.MARKDOWN_V2) # Escape '!'
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Pong!")
+    await update.message.reply_text("Pong\\!", parse_mode=ParseMode.MARKDOWN_V2) # Escape '!'
 
 async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text_to_translate = ' '.join(context.args)
     if not text_to_translate:
-        await update.message.reply_text("Bạn cần cung cấp văn bản để thông dịch. Ví dụ: /translate Xin chào thế giới")
+        # Escape the example command to be safe
+        example_command = _escape_markdown_v2("/translate Xin chào thế giới")
+        await update.message.reply_text(f"Bạn cần cung cấp văn bản để thông dịch\\. Ví dụ: {example_command}", parse_mode=ParseMode.MARKDOWN_V2)
         return
 
     if translation_service_instance is None or translation_service_instance.llm is None:
-        await update.message.reply_text("Tính năng thông dịch hiện không khả dụng. Vui lòng kiểm tra cấu hình bot (GOOGLE_API_KEY).")
+        await update.message.reply_text(
+            _escape_markdown_v2("Tính năng thông dịch hiện không khả dụng. Vui lòng kiểm tra cấu hình bot (GOOGLE_API_KEY)."),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
         logger.warning("TranslationService instance not initialized or LLM is None for translate_command.")
         return
 
-    await update.message.reply_text("Đang thông dịch, vui lòng chờ...")
+    await update.message.reply_text(_escape_markdown_v2("Đang thông dịch, vui lòng chờ..."), parse_mode=ParseMode.MARKDOWN_V2)
     
     try:
         translated_text = await translation_service_instance.translate_text(text_to_translate)
-        # Using HTML <pre> tag for preformatted text, which is good for translations
-        response_message_html = f"Kết quả thông dịch:\n\n<pre>{translated_text}</pre>"
+        # Using HTML <pre> tag for preformatted text is a good choice for translations as it preserves spacing
+        # and avoids Markdown parsing issues for the translated content itself.
+        response_message_html = f"Kết quả thông dịch:\n\n<pre>{translated_text}</pre>" # translated_text should be HTML escaped by the library if it's not already.
         await update.message.reply_html(response_message_html) 
     except Exception as e:
         logger.error(f"Lỗi khi thực hiện thông dịch: {e}", exc_info=True)
-        await update.message.reply_text("Đã xảy ra lỗi khi thông dịch văn bản của bạn. Vui lòng thử lại.")
+        await update.message.reply_text(
+            _escape_markdown_v2("Đã xảy ra lỗi khi thông dịch văn bản của bạn. Vui lòng thử lại."),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
 async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles requests for Kali tool recommendations using RAG."""
     if not context.args:
-        await update.message.reply_text("Vui lòng cung cấp câu hỏi. Ví dụ: /ask_kali cách sử dụng nmap để quét port.")
+        example_command = _escape_markdown_v2("/ask_kali cách sử dụng nmap để quét port.")
+        await update.message.reply_text(f"Vui lòng cung cấp câu hỏi\\. Ví dụ: {example_command}", parse_mode=ParseMode.MARKDOWN_V2)
         return
 
     query = " ".join(context.args)
-    # Escape the user's query for display in the "searching for" message
     escaped_query_display = _escape_markdown_v2(query)
-    await update.message.reply_text(f"Đang tìm kiếm gợi ý cho: '{escaped_query_display}'...", parse_mode=ParseMode.MARKDOWN_V2)
+    # SỬA LỖI Ở ĐÂY: thoát các dấu chấm trong "..."
+    await update.message.reply_text(f"Đang tìm kiếm gợi ý cho: '{escaped_query_display}'\\.\\.\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
     if kali_rag_service_instance is None or kali_rag_service_instance.rag_chain is None:
         await update.message.reply_text(
@@ -108,17 +121,12 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     try:
-        # The response from RAG is expected to be already formatted in MarkdownV2
         response_markdown = await kali_rag_service_instance.ask_question(query)
-        
-        # Send the MarkdownV2 response directly
-        # Ensure the response_markdown is indeed valid MarkdownV2 as per LLM's output
         await update.message.reply_text(response_markdown, parse_mode=ParseMode.MARKDOWN_V2) 
         
     except Exception as e:
         logger.error(f"Lỗi khi gọi Kali RAG service: {e}", exc_info=True)
-        # Escape the error message content if shown to user, to prevent formatting issues
-        error_detail = str(e)[:100] # Truncate long error messages
+        error_detail = str(e)[:100] 
         user_error_message = _escape_markdown_v2(f"Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.\nChi tiết: {error_detail}")
         await update.message.reply_text(user_error_message, parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -126,26 +134,9 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Xử lý các tin nhắn không phải là lệnh. Gợi ý sử dụng lệnh."""
     if update.message.text:
-        # Avoid responding to commands
         if update.message.text.startswith('/'): 
             return 
         
-    # This text is static and simple, but for consistency, we can escape it.
-    # Or, if it contains intended MarkdownV2 (like inline code `...`),
-    # ensure it's correctly formatted and send directly with ParseMode.MARKDOWN_V2.
-    # Here, we use _escape_markdown_v2 for safety, assuming it's plain text with examples.
-    echo_reply_text = (
-        "Tôi là bot dịch thuật và gợi ý lệnh pentest. "
-        "Vui lòng sử dụng:\n"
-        "  `/translate <văn bản của bạn>` để dịch.\n"
-        "  `/ask_kali <câu hỏi của bạn>` để hỏi về công cụ Kali.\n"
-        "  Hoặc `/help` để biết thêm."
-    )
-    # The text above is crafted with `/command` which _escape_markdown_v2 will turn into \/command.
-    # If we want the `/` to be literal and not escaped, we should craft the string carefully
-    # or handle it specially. For now, let's craft it as MarkdownV2.
-    
-    # Corrected approach for echo_message: craft as MarkdownV2 directly
     echo_reply_text_md = (
         "Tôi là bot dịch thuật và gợi ý lệnh pentest\\. \n"
         "Vui lòng sử dụng:\n"
@@ -157,8 +148,6 @@ async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # This help text is crafted with MarkdownV2 in mind.
-    # No need to call _escape_markdown_v2 on it.
     help_text_markdown_v2 = (
         "Xin chào\\! Tôi là bot hỗ trợ pentest\\.\n"
         "Dưới đây là các lệnh bạn có thể sử dụng:\n\n"
