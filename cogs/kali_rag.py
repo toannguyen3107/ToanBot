@@ -180,9 +180,9 @@ class KaliRAGService:
         - **Liên kết (Links)**: Sử dụng định dạng `[văn bản hiển thị](URL)`. Ví dụ: `[Trang chủ Kali](https://www.kali.org/)`. Tránh URL trần.
 
         Ngữ cảnh công cụ:
-        {context_placeholder}
+        {context}
         
-        Câu hỏi của người dùng: {question_placeholder}
+        Câu hỏi của người dùng: {question}
 
         Câu trả lời (tiếng Việt, định dạng MarkdownV2):
         """
