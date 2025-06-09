@@ -190,7 +190,10 @@ def scrape_single_tool_page(tool_info):
                     "sub_command": direct_cmd_name,
                     "usage_example": f"Use `{direct_cmd_name}` directly. Consult `{direct_cmd_name} -h` or `man {direct_cmd_name}` for options."
                 })
-
+    # if tool name ends with '$' -> remove it
+    if tool_name.endswith('$'):
+        tool_name = tool_name[:-1].strip()
+        
     return {
         "name": tool_name,
         "url": tool_url,
