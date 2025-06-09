@@ -5,10 +5,8 @@ import json
 import os
 import time
 import shutil
-import re # Đảm bảo import re
-
-# from langchain_community.vectorstores import Chroma # Dòng cũ nếu bạn đã đổi
-from langchain_chroma import Chroma # Dòng mới
+import re
+from langchain_chroma import Chroma
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -119,23 +117,20 @@ class KaliRAGService:
 
         if os.path.exists(CHROMA_DB_DIR):
             try:
-                # Thử tải DB hiện có MÀ KHÔNG XÓA TRƯỚC
                 logger.info(f"[{time.strftime('%H:%M:%S')}] Attempting to load existing Chroma DB from {CHROMA_DB_DIR}.")
-                # Sử dụng client để kiểm tra collection trước
-                import chromadb # Đặt import ở đây để tránh lỗi nếu chromadb chưa được cài
+                import chromadb
                 client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
-                collection_name = "kali_rag_collection" # Hoặc tên collection mặc định của Chroma
+                collection_name = "kali_rag_collection"
 
                 try:
                     collection = client.get_collection(name=collection_name)
                     if collection.count() == 0:
                         logger.warning(f"[{time.strftime('%H:%M:%S')}] Existing Chroma collection '{collection_name}' is empty. Will re-populate.")
-                        # Không xóa thư mục, chỉ cần thêm dữ liệu vào collection rỗng này
                         vectorstore = Chroma(
-                            client=client, # Sử dụng client hiện có
+                            client=client,
                             collection_name=collection_name,
                             embedding_function=embeddings,
-                            persist_directory=CHROMA_DB_DIR # Vẫn cần để nó biết nơi persist
+                            persist_directory=CHROMA_DB_DIR
                         )
                         logger.info(f"[{time.strftime('%H:%M:%S')}] Adding {len(documents)} documents to empty collection.")
                         vectorstore.add_documents(documents)
@@ -213,7 +208,7 @@ class KaliRAGService:
           Some tool output here...
           ```
         - **Nhấn mạnh (Bold/Italics)**: Sử dụng dấu sao cho *văn bản đậm* (`*text*`) và dấu gạch dưới cho _văn bản nghiêng_ (`_text_`) một cách tiết chế, chỉ khi thực sự cần làm nổi bật một thuật ngữ hoặc khái niệm quan trọng. Tránh lạm dụng.
-        - **Ký tự đặc biệt**: Telegram MarkdownV2 sử dụng các ký tự đặc biệt: `_*[]()~`>#+-=|{{}}}.!`. Nếu bạn cần hiển thị các ký tự này theo nghĩa đen (không phải là một phần của định dạng Markdown), chúng phải được thoát bằng dấu gạch chéo ngược (`\\`). Ví dụ, để hiển thị `example.com`, bạn sẽ viết `example\\.com`. Hãy cố gắng tạo ra MarkdownV2 hợp lệ và tự thoát các ký tự cần thiết trong văn bản thường.
+        - **Ký tự đặc biệt**: Telegram MarkdownV2 sử dụng các ký tự đặc biệt: `_*[]()~`>#+-=|{{}}.!`. Nếu bạn cần hiển thị các ký tự này theo nghĩa đen (không phải là một phần của định dạng Markdown), chúng phải được thoát bằng dấu gạch chéo ngược (`\\`). Ví dụ, để hiển thị `example.com`, bạn sẽ viết `example\\.com`. Hãy cố gắng tạo ra MarkdownV2 hợp lệ và tự thoát các ký tự cần thiết trong văn bản thường.
         - **Danh sách (Lists)**: Nếu bạn muốn tạo danh sách, hãy sử dụng gạch đầu dòng (ví dụ: `\\- Mục 1`, `\\* Mục A`) hoặc số theo sau là dấu chấm (`1\\. Bước một`). Đảm bảo có khoảng trắng sau ký hiệu danh sách.
         - **Liên kết (Links)**: Sử dụng định dạng `[văn bản hiển thị](URL)`. Ví dụ: `[Trang chủ Kali](https://www.kali.org/)`. Tránh URL trần.
 
