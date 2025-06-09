@@ -180,13 +180,13 @@ Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên
   <pre><code>nmap -sV -p 80,443 example.com</code></pre>
 - **Nhấn mạnh**: Sử dụng `<b>text</b>` cho đậm, `<i>text</i>` cho nghiêng, `<u>text</u>` cho gạch chân, `<s>text</s>` cho gạch ngang.
 - **Ký tự đặc biệt HTML**: Trong văn bản thông thường (ngoài thẻ `<code>` được đặt trong `<pre>`), các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&`.
-- **Danh sách (Lists)**: Vì thẻ `<ul>` và `<li>` không được hỗ trợ chính thức, hãy tạo danh sách bằng cách sử dụng dấu gạch đầu dòng (ví dụ: `-` hoặc `•`) hoặc số, theo sau là văn bản và thẻ `<br>` để xuống dòng cho mỗi mục.
+- **Danh sách (Lists)**: Vì thẻ `<ul>` và `<li>` không được hỗ trợ chính thức, hãy tạo danh sách bằng cách sử dụng dấu gạch đầu dòng (ví dụ: `-` hoặc `•`) hoặc số, theo sau là văn bản và ký tự `\\n` để xuống dòng cho mỗi mục.
   Ví dụ tạo danh sách:
-  - Mục 1<br>
-  - Mục 2<br>
-  Hoặc:<br>
-  1. Bước một<br>
-  2. Bước hai<br>
+  - Mục 1
+  - Mục 2
+  Hoặc:
+  1. Bước một
+  2. Bước hai
 - **Liên kết (Links)**: Sử dụng `<a href="URL">văn bản hiển thị</a>`.
 - **Ngắt dòng**: Sử dụng thẻ \\n để ngắt dòng một cách tường minh khi cần thiết.
 

@@ -123,10 +123,10 @@ async def echo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return 
         
     echo_reply_text_html = (
-        "Tôi là bot dịch thuật và gợi ý lệnh pentest.<br>"
-        "Vui lòng sử dụng:<br>"
-        "  • <code>/translate &lt;văn bản của bạn&gt;</code> để dịch.<br>"
-        "  • <code>/ask_kali &lt;câu hỏi của bạn&gt;</code> để hỏi về công cụ Kali.<br>"
+        "Tôi là bot dịch thuật và gợi ý lệnh pentest.\n"
+        "Vui lòng sử dụng:\n"
+        "  • <code>/translate &lt;văn bản của bạn&gt;</code> để dịch.\n"
+        "  • <code>/ask_kali &lt;câu hỏi của bạn&gt;</code> để hỏi về công cụ Kali.\n"
         "  • Hoặc <code>/help</code> để biết thêm."
     )
     await update.message.reply_text(echo_reply_text_html, parse_mode=ParseMode.HTML)
