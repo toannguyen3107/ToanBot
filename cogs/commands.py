@@ -111,7 +111,7 @@ async def ask_kali_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             exc_info=True
         )
         # Nếu LLM vẫn tạo HTML không hợp lệ, thông báo lỗi chung
-        user_error_message = _escape_html(f"Đã xảy ra lỗi khi hiển thị kết quả từ AI do vấn đề định dạng HTML.\nChi tiết kỹ thuật: {str(e_tg_bad)[:100]}")
+        user_error_message = _escape_html(f"Đã xảy ra lỗi khi hiển thị kết quả từ AI do vấn đề định dạng HTML.\nChi tiết kỹ thuật: {str(response_html)[:100]}")
         await update.message.reply_text(user_error_message, parse_mode=ParseMode.HTML)
 
     except Exception as e:
