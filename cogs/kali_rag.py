@@ -225,7 +225,10 @@ Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các hư�
         logger.info(f"Phase 1 RAG: Querying for '{query}'")
         response_phase1 = await self.rag_chain_phase1.ainvoke(query)
         response_phase1 = response_phase1.strip()
-        logger.info(f"Phase 1 RAG: Response: '{response_phase1[:200].replace('\n', ' ')}...'")
+        
+        # SỬA LỖI F-STRING Ở ĐÂY
+        log_response_preview = response_phase1[:200].replace('\n', ' ')
+        logger.info(f"Phase 1 RAG: Response: '{log_response_preview}...'")
 
         if response_phase1 != no_context_marker:
             logger.info("Phase 1 RAG: Answer found in context.")
