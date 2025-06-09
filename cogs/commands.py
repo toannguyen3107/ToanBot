@@ -18,26 +18,11 @@ kali_rag_service_instance: KaliRAGService = None
 # Hàm trợ giúp để escape ký tự đặc biệt cho HTML
 def _escape_html(text: str, escape_quotes: bool = True) -> str:
     """Escapes special characters for Telegram's HTML parse_mode."""
+    # Loại bỏ các thẻ <p> và thay </p> bằng xuống dòng
+    text = re.sub(r'<p\s*>', '', text)
+    text = re.sub(r'</p\s*>', '\n', text)
     return html.escape(str(text), quote=escape_quotes)
 
-# Hàm _escape_markdown_v2 có thể vẫn cần nếu một số tin nhắn vẫn dùng MarkdownV2
-# Hoặc có thể xóa nếu tất cả chuyển sang HTML
-def _escape_markdown_v2(text: str) -> str:
-    code_block_pattern = r'```(?:[a-zA-Z0-9_]+)?\n(.*?)\n```'
-    special_chars = r'_*[]()~`>#+-=|{}.!'
-    
-    code_blocks = []
-    def replace_code_block(match):
-        code_blocks.append(match.group(0))
-        return f"__CODE_BLOCK_PLACEHOLDER_{len(code_blocks) - 1}__"
-
-    text_with_placeholders = re.sub(code_block_pattern, replace_code_block, text, flags=re.DOTALL)
-    escaped_text = text_with_placeholders.replace('\\', '\\\\')
-    escaped_text = re.sub(r'([%s])' % re.escape(special_chars), r'\\\1', escaped_text)
-
-    for i, code_block in enumerate(code_blocks):
-        escaped_text = escaped_text.replace(f"__CODE_BLOCK_PLACEHOLDER_{i}__", code_block)
-    return escaped_text
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
