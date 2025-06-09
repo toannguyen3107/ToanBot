@@ -6,7 +6,7 @@ import os
 import time
 import shutil # Import shutil for rmtree
 
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma # Dòng mới
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
