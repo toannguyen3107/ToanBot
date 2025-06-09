@@ -20,10 +20,8 @@ logger = logging.getLogger(__name__)
 DATA_FILE = "data/kali_tools_data.json"
 CHROMA_DB_DIR = "./chroma_db"
 
-
 def _escape_html_internal(text: str) -> str:
     return html.escape(str(text))
-
 
 class KaliRAGService:
     def __init__(self, google_api_key: str):
@@ -89,6 +87,7 @@ class KaliRAGService:
             )
         logger.info(f"[{time.strftime('%H:%M:%S')}] Loaded {len(documents)} documents for RAG.")
         return documents
+
 
     def _initialize_rag_chain(self):
         # ... (Phần load documents và khởi tạo embeddings, vectorstore giữ nguyên) ...
@@ -161,34 +160,42 @@ class KaliRAGService:
         retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=self.google_api_key)
         
-        # CẬP NHẬT PROMPT ĐỂ YÊU CẦU HTML
+        # CẬP NHẬT PROMPT HTML THEO CÁC THẺ TELEGRAM HỖ TRỢ
         html_template_string = """Bạn là một chuyên gia pentesting trợ giúp, cung cấp câu trả lời bằng tiếng Việt.
 Dựa vào các thông tin công cụ Kali Linux sau đây ('Ngữ cảnh công cụ'), hãy gợi ý các công cụ phù hợp và cung cấp các lệnh mẫu để thực hiện tác vụ pentest của người dùng.
 Nếu thông tin từ 'Ngữ cảnh công cụ' không đủ hoặc không liên quan trực tiếp, hãy sử dụng kiến thức chung của bạn về Kali Linux và pentesting để đưa ra gợi ý hợp lý và thực tế.
 
-**QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp **HTML** của Telegram.
-- **Khối mã (Code Blocks)**: Sử dụng thẻ `<pre><code>...</code></pre>` để hiển thị các lệnh, cấu hình, hoặc ví dụ mã. Bên trong `<code>`, các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&` tương ứng.
+**QUAN TRỌNG**: Định dạng câu trả lời của bạn bằng cú pháp **HTML** của Telegram. Chỉ sử dụng các thẻ HTML sau:
+`<b>`, `<strong>` (cho chữ đậm)
+`<i>`, `<em>` (cho chữ nghiêng)
+`<u>`, `<ins>` (cho chữ gạch chân)
+`<s>`, `<strike>`, `<del>` (cho chữ gạch ngang)
+`<span class="tg-spoiler">` hoặc `<tg-spoiler>` (cho spoiler/văn bản bị ẩn)
+`<a href="URL">text</a>` (cho siêu liên kết)
+`<code>text</code>` (cho mã inline)
+`<pre>text</pre>` (cho khối mã, có thể lồng `<code>` bên trong: `<pre><code>...</code></pre>`)
+
+- **Khối mã (Code Blocks)**: Sử dụng thẻ `<pre><code>...</code></pre>` để hiển thị các lệnh hoặc ví dụ mã. Bên trong `<code>`, các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&`.
   Ví dụ cho lệnh:
   <pre><code>nmap -sV -p 80,443 example.com</code></pre>
-  Ví dụ cho văn bản/output mẫu:
-  <pre><code>Some tool output <tag> here...</code></pre>
-- **Nhấn mạnh (Bold/Italics)**: Sử dụng thẻ `<b>văn bản đậm</b>` cho văn bản đậm và `<i>văn bản nghiêng</i>` cho văn bản nghiêng. Sử dụng tiết chế.
-- **Ký tự đặc biệt HTML**: Trong văn bản thông thường (ngoài thẻ `<code>`), các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&`. Dấu ngoặc kép `"` có thể được escape thành `"`.
-- **Danh sách (Lists)**: Sử dụng thẻ `<ul>` (danh sách không thứ tự) hoặc `<ol>` (danh sách có thứ tự) với các thẻ `<li>` cho mỗi mục.
-  Ví dụ:
-  <ul>
-    <li>Mục 1</li>
-    <li>Mục 2</li>
-  </ul>
-- **Liên kết (Links)**: Sử dụng thẻ `<a>` với thuộc tính `href`. Ví dụ: `<a href="https://www.kali.org/">Trang chủ Kali</a>`.
-- **Ngắt dòng**: Sử dụng thẻ `<br>` để ngắt dòng nếu cần, hoặc để các khối như `<p>`, `<ul>`, `<pre>` tự xử lý ngắt dòng.
+- **Nhấn mạnh**: Sử dụng `<b>text</b>` cho đậm, `<i>text</i>` cho nghiêng, `<u>text</u>` cho gạch chân, `<s>text</s>` cho gạch ngang.
+- **Ký tự đặc biệt HTML**: Trong văn bản thông thường (ngoài thẻ `<code>` được đặt trong `<pre>`), các ký tự `<`, `>`, `&` phải được escape thành `<`, `>`, `&`.
+- **Danh sách (Lists)**: Vì thẻ `<ul>` và `<li>` không được hỗ trợ chính thức, hãy tạo danh sách bằng cách sử dụng dấu gạch đầu dòng (ví dụ: `-` hoặc `•`) hoặc số, theo sau là văn bản và thẻ `<br>` để xuống dòng cho mỗi mục.
+  Ví dụ tạo danh sách:
+  - Mục 1<br>
+  - Mục 2<br>
+  Hoặc:<br>
+  1. Bước một<br>
+  2. Bước hai<br>
+- **Liên kết (Links)**: Sử dụng `<a href="URL">văn bản hiển thị</a>`.
+- **Ngắt dòng**: Sử dụng thẻ `<br>` để ngắt dòng một cách tường minh khi cần thiết.
 
 Ngữ cảnh công cụ:
 {context}
 
 Câu hỏi của người dùng: {question}
 
-Câu trả lời (tiếng Việt, định dạng HTML):
+Câu trả lời (tiếng Việt, định dạng HTML hợp lệ theo các thẻ đã liệt kê):
 """
         rag_prompt = ChatPromptTemplate.from_template(html_template_string)
 
@@ -198,21 +205,20 @@ Câu trả lời (tiếng Việt, định dạng HTML):
             | llm
             | StrOutputParser()
         )
-        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode).")
+        logger.info(f"[{time.strftime('%H:%M:%S')}] RAG chain in KaliRAGService initialized successfully (HTML mode - restricted tags).")
 
     async def ask_question(self, query: str) -> str:
         if self.rag_chain is None:
-            return _escape_html_internal( # Sử dụng escape HTML cho thông báo lỗi
+            return _escape_html_internal(
                 "Tính năng gợi ý công cụ Kali hiện không khả dụng. "
                 "Vui lòng kiểm tra cấu hình bot hoặc thông báo cho admin."
             )
         try:
             response = await self.rag_chain.ainvoke(query)
-            # LLM bây giờ trả về HTML, không cần escape nữa ở đây
             return response 
         except Exception as e:
             logger.error(f"Error during RAG chain execution for query '{query}': {e}", exc_info=True)
             error_detail = str(e)[:150] 
-            return _escape_html_internal( # Sử dụng escape HTML cho thông báo lỗi
+            return _escape_html_internal(
                 f"Đã xảy ra lỗi khi tìm kiếm gợi ý. Vui lòng thử lại sau. Lỗi: {error_detail}"
             )
